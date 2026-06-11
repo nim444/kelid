@@ -7,64 +7,92 @@ struct SplashStep: View {
     @State private var appear = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ZStack {
+            AnimatedMeshBackground()
 
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 132, height: 132)
-                .shadow(color: Color.accentColor.opacity(0.45), radius: 28, y: 10)
-                .scaleEffect(appear ? 1 : 0.86)
-                .opacity(appear ? 1 : 0)
+            VStack(spacing: 0) {
+                Spacer()
 
-            VStack(spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                monoIcon
+                    .stagger(appear, delay: 0.0)
+
+                VStack(spacing: 10) {
                     Text("Kelid")
-                        .font(.kelid(50, .bold))
+                        .font(.kelid(54, .bold))
                         .foregroundStyle(.primary)
-                    Text("کلید")
-                        .font(.system(size: 30, weight: .regular))
-                        .foregroundStyle(.tertiary)
-                        .baselineOffset(2)
+                        .stagger(appear, delay: 0.08)
+
+                    Text("Secret access layer for AI agents")
+                        .font(.kelid(16, .medium))
+                        .foregroundStyle(.secondary)
+                        .stagger(appear, delay: 0.16)
                 }
+                .padding(.top, 26)
 
-                Text("Secret access layer for AI agents")
-                    .font(.kelid(16, .medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 22)
-            .opacity(appear ? 1 : 0)
-            .offset(y: appear ? 0 : 10)
+                Spacer()
 
-            Spacer()
-
-            Button(action: onNext) {
-                HStack(spacing: 10) {
-                    Text("Get Started")
-                        .font(.kelid(17, .semibold))
-                    Image(systemName: "arrow.right")
-                        .font(.body.weight(.semibold))
+                Button(action: onNext) {
+                    HStack(spacing: 10) {
+                        Text("Get Started")
+                            .font(.kelid(17, .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.body.weight(.semibold))
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 15)
                 }
-                .padding(.horizontal, 30)
-                .padding(.vertical, 14)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
-            .tint(.accentColor)
-            .keyboardShortcut(.defaultAction)
-            .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
-            .scaleEffect(appear ? 1 : 0.9)
-            .opacity(appear ? 1 : 0)
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.extraLarge)
+                .tint(.accentColor)
+                .keyboardShortcut(.defaultAction)
+                .shadow(color: Color.accentColor.opacity(0.45), radius: 22, y: 8)
+                .stagger(appear, delay: 0.26)
 
-            Spacer().frame(height: 44)
+                Spacer().frame(height: 48)
+            }
+            .padding(.horizontal, 40)
         }
-        .padding(.horizontal, 40)
         .onAppear {
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.7)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 appear = true
             }
         }
+    }
+
+    private var monoIcon: some View {
+        Image(systemName: "key.fill")
+            .font(.system(size: 58, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 128, height: 128)
+            .background {
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .fill(.white.opacity(0.06))
+                    .background(
+                        RoundedRectangle(cornerRadius: 30, style: .continuous)
+                            .stroke(.white.opacity(0.12), lineWidth: 1)
+                    )
+            }
+            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 30, style: .continuous))
+            .shadow(color: Color.accentColor.opacity(0.35), radius: 30, y: 12)
+    }
+}
+
+/// Staggered fade-up: each element rises ~26px while fading in, on a short delay.
+private struct StaggerModifier: ViewModifier {
+    let active: Bool
+    let delay: Double
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? 1 : 0)
+            .offset(y: active ? 0 : 26)
+            .animation(.spring(response: 0.7, dampingFraction: 0.78).delay(delay), value: active)
+    }
+}
+
+private extension View {
+    func stagger(_ active: Bool, delay: Double) -> some View {
+        modifier(StaggerModifier(active: active, delay: delay))
     }
 }

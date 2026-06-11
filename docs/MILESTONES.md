@@ -15,6 +15,22 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.4 — splash polish: mono icon, motion, moving gradient (2026-06-11)
+
+**What shipped.** Reworked the splash per feedback:
+- **Monochrome icon** — replaced the colorful app icon with a white `key.fill`
+  glyph in a glass rounded-rect, matching the IBM Plex Mono minimal aesthetic.
+- **Removed** the Persian "کلید" from the splash.
+- **Staggered fade-up entrance** — icon, title, subline, and button each rise
+  ~26px while fading in on a short cascading delay (`StaggerModifier`, spring).
+- **Moving gradient** — new `AnimatedMeshBackground` (`MeshGradient` driven by a
+  `TimelineView`, control points drift on slow sine/cosine waves in the accent /
+  teal range over a near-black base). Subtle, continuous motion behind content.
+
+**Wipe.** Not needed — pure UI.
+
+---
+
 ## Milestone 2.3 — IBM Plex Mono type identity (2026-06-11)
 
 **What shipped.** Bundled **IBM Plex Mono** (OFL, from the official IBM/plex
