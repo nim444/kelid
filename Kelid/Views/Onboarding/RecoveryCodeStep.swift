@@ -8,70 +8,103 @@ struct RecoveryCodeStep: View {
     @State private var saved = false
     @State private var copied = false
 
-    private var codeLines: [String] {
-        let groups = code.split(separator: "-").map(String.init)
-        guard groups.count == 8 else { return [code] }
-        return [
-            groups[0..<4].joined(separator: "-"),
-            groups[4..<8].joined(separator: "-"),
-        ]
+    private var groups: [String] {
+        code.split(separator: "-").map(String.init)
     }
 
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "key.viewfinder")
-                .font(.system(size: 36))
-                .foregroundStyle(LinearGradient.kelidAccent)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
 
-            Text("Recovery Code")
-                .font(.title.bold())
-            Text("This is the only way back in if you forget your master passphrase.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "key.viewfinder")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(.tint)
 
             VStack(spacing: 6) {
-                ForEach(codeLines, id: \.self) { line in
-                    Text(line)
-                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                        .textSelection(.enabled)
+                Text("Recovery Code")
+                    .font(.kelid(28, .bold))
+                Text("The only way back in if you forget your master passphrase.")
+                    .font(.kelid(13, .regular))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Code as a grid of monospace chips — two rows of four.
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                    Text(group)
+                        .font(.kelid(17, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: .rect(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(.primary.opacity(0.06), lineWidth: 1)
+                        )
                 }
             }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 28)
-            .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .frame(maxWidth: 440)
+            .textSelection(.enabled)
 
             Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(code, forType: .string)
-                copied = true
-                Task {
-                    try? await Task.sleep(for: .seconds(1.5))
-                    copied = false
-                }
+                copy()
             } label: {
                 Label(copied ? "Copied" : "Copy Code", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    .font(.kelid(13, .medium))
             }
             .buttonStyle(.glass)
+            .controlSize(.regular)
 
-            Label(
-                "Shown only once. Kelid keeps only a hash of this code — write it down or store it in a safe place now.",
-                systemImage: "exclamationmark.triangle"
+            // Warning as a contained callout, not raw orange text.
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("Shown only once. Kelid stores just a hash of this code — write it down or save it somewhere safe now.")
+                    .font(.kelid(12, .regular))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: 440, alignment: .leading)
+            .background(.orange.opacity(0.08), in: .rect(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(.orange.opacity(0.25), lineWidth: 1)
             )
-            .font(.callout)
-            .foregroundStyle(.orange)
-            .frame(maxWidth: 440)
 
-            Toggle("I saved my recovery code", isOn: $saved)
-                .toggleStyle(.checkbox)
+            Toggle(isOn: $saved) {
+                Text("I saved my recovery code")
+                    .font(.kelid(13, .medium))
+            }
+            .toggleStyle(.checkbox)
 
-            Button("Continue", action: onNext)
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!saved)
+            Button(action: onNext) {
+                Text("Continue")
+                    .font(.kelid(15, .semibold))
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 11)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .disabled(!saved)
+            .opacity(saved ? 1 : 0.5)
 
-            Spacer().frame(height: 8)
+            Spacer().frame(height: 4)
         }
         .padding(.horizontal, 30)
+    }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(code, forType: .string)
+        copied = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            copied = false
+        }
     }
 }

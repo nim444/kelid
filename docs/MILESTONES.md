@@ -15,6 +15,24 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.6 — neutral gradient + recovery redesign (2026-06-11)
+
+**What shipped (feedback round).**
+- **Gradient toned down + theme-aware.** `AnimatedMeshBackground` now reads
+  `colorScheme`: near-black field in dark mode, near-white in light mode, with a
+  single contained blue glow cell that drifts — most of the field is neutral, just
+  a hint of blue (was all-blue before). Splash text/icon/button switched from
+  hardcoded `.white` to `.primary`/`.secondary` so they adapt to light mode.
+- **Recovery Code redesigned.** Replaced the single selected-looking code block
+  with a clean 2×4 grid of monospace chips (each group in its own material tile),
+  IBM Plex Mono throughout, a `.glass` Copy button, the once-only warning as a
+  contained orange callout (icon + text, soft tinted box) instead of raw orange
+  text, and a capsule glass-prominent Continue gated on the saved checkbox.
+
+**Wipe.** Not needed — pure UI.
+
+---
+
 ## Milestone 2.5 — splash: full-bleed gradient, real icon, glass button (2026-06-11)
 
 **What shipped (feedback round).**

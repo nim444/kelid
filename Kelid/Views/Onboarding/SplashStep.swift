@@ -15,12 +15,12 @@ struct SplashStep: View {
             VStack(spacing: 10) {
                 Text("Kelid")
                     .font(.kelid(54, .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .stagger(appear, delay: 0.08)
 
                 Text("Secret access layer for AI agents")
                     .font(.kelid(16, .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.secondary)
                     .stagger(appear, delay: 0.16)
             }
             .padding(.top, 26)
@@ -34,7 +34,7 @@ struct SplashStep: View {
                     Image(systemName: "arrow.right")
                         .font(.callout.weight(.semibold))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 26)
                 .padding(.vertical, 13)
             }
@@ -60,7 +60,7 @@ struct SplashStep: View {
             .resizable()
             .scaledToFit()
             .frame(width: 60, height: 60)
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .frame(width: 128, height: 128)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 30, style: .continuous))
             .shadow(color: .black.opacity(0.35), radius: 24, y: 14)
