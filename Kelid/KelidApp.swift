@@ -4,6 +4,10 @@ import SwiftUI
 struct KelidApp: App {
     @State private var store = AppStore()
 
+    init() {
+        KelidFont.registerIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

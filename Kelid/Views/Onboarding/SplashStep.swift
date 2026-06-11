@@ -18,10 +18,10 @@ struct SplashStep: View {
                 .scaleEffect(appear ? 1 : 0.86)
                 .opacity(appear ? 1 : 0)
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("Kelid")
-                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .font(.kelid(50, .bold))
                         .foregroundStyle(.primary)
                     Text("کلید")
                         .font(.system(size: 30, weight: .regular))
@@ -30,7 +30,7 @@ struct SplashStep: View {
                 }
 
                 Text("Secret access layer for AI agents")
-                    .font(.title3.weight(.medium))
+                    .font(.kelid(16, .medium))
                     .foregroundStyle(.secondary)
             }
             .padding(.top, 22)
@@ -42,7 +42,7 @@ struct SplashStep: View {
             Button(action: onNext) {
                 HStack(spacing: 10) {
                     Text("Get Started")
-                        .font(.title3.weight(.semibold))
+                        .font(.kelid(17, .semibold))
                     Image(systemName: "arrow.right")
                         .font(.body.weight(.semibold))
                 }

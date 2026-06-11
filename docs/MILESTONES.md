@@ -15,6 +15,26 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.3 — IBM Plex Mono type identity (2026-06-11)
+
+**What shipped.** Bundled **IBM Plex Mono** (OFL, from the official IBM/plex
+repo) in four weights — Regular/Medium/SemiBold/Bold — at
+`Kelid/Resources/Fonts/`. `KelidFont.swift` registers them with CoreText at
+launch (`CTFontManagerRegisterFontsForURL`, idempotent) and exposes
+`Font.kelid(size, weight)` helpers. Registration is wired in `KelidApp.init`.
+Splash title, subline, and button now use Plex Mono. (Persian "کلید" stays on
+the system font — Plex Mono has no Arabic-script coverage.)
+
+**Note.** The user asked for "the IBM font from featherbar" — featherbar actually
+renders in **SF Mono**, not IBM Plex; confirmed with the user and chose IBM Plex
+Mono for the monospaced technical identity. Fonts are registered at runtime
+rather than via `ATSApplicationFontsPath` because the Info.plist is generated.
+Synchronized group auto-copies the .ttf files into the bundle Resources.
+
+**Wipe.** Not needed — pure UI/resources.
+
+---
+
 ## Milestone 2.2 — splash redesign (2026-06-11)
 
 **What shipped.** Reworked `SplashStep` for a more modern feel: larger app icon
