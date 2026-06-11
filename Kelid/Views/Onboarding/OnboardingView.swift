@@ -27,7 +27,10 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            AnimatedMeshBackground()
+
+            VStack(spacing: 0) {
             HStack {
                 if canGoBack {
                     Button {
@@ -76,9 +79,9 @@ struct OnboardingView: View {
                 }
             }
             .padding(.bottom, 18)
+            }
         }
         .frame(minWidth: 680, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity)
-        .kelidWindowBackground()
         .background(WindowConfigurator(hideSystemButtons: false))
     }
 

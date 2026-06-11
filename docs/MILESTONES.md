@@ -15,6 +15,25 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.5 — splash: full-bleed gradient, real icon, glass button (2026-06-11)
+
+**What shipped (feedback round).**
+- **Full-bleed gradient** — moved `AnimatedMeshBackground` up to `OnboardingView`
+  (behind header + content + dots) and dropped `kelidWindowBackground`, so there's
+  no dark band/ring at the top; the gradient now covers the whole window
+  uniformly on every onboarding step. Recolored the mesh so corners are deep blue
+  (not near-black) — one cohesive field, no vignette.
+- **Real icon** — extracted the user's key vector from `AppIcon.icon/Assets`
+  into `Assets.xcassets/KeyGlyph.imageset` (template, vector-preserving) and use
+  *that* shape (white, in a glass rounded-rect) instead of the SF Symbol.
+- **Button** — switched Get Started to `.buttonStyle(.glass)`, smaller
+  (controlSize large, tighter padding, 15pt), translucent glass instead of solid
+  accent.
+
+**Wipe.** Not needed — pure UI.
+
+---
+
 ## Milestone 2.4 — splash polish: mono icon, motion, moving gradient (2026-06-11)
 
 **What shipped.** Reworked the splash per feedback:

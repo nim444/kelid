@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct SplashStep: View {
@@ -7,52 +6,47 @@ struct SplashStep: View {
     @State private var appear = false
 
     var body: some View {
-        ZStack {
-            AnimatedMeshBackground()
+        VStack(spacing: 0) {
+            Spacer()
 
-            VStack(spacing: 0) {
-                Spacer()
+            monoIcon
+                .stagger(appear, delay: 0.0)
 
-                monoIcon
-                    .stagger(appear, delay: 0.0)
+            VStack(spacing: 10) {
+                Text("Kelid")
+                    .font(.kelid(54, .bold))
+                    .foregroundStyle(.white)
+                    .stagger(appear, delay: 0.08)
 
-                VStack(spacing: 10) {
-                    Text("Kelid")
-                        .font(.kelid(54, .bold))
-                        .foregroundStyle(.primary)
-                        .stagger(appear, delay: 0.08)
-
-                    Text("Secret access layer for AI agents")
-                        .font(.kelid(16, .medium))
-                        .foregroundStyle(.secondary)
-                        .stagger(appear, delay: 0.16)
-                }
-                .padding(.top, 26)
-
-                Spacer()
-
-                Button(action: onNext) {
-                    HStack(spacing: 10) {
-                        Text("Get Started")
-                            .font(.kelid(17, .semibold))
-                        Image(systemName: "arrow.right")
-                            .font(.body.weight(.semibold))
-                    }
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 15)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-                .tint(.accentColor)
-                .keyboardShortcut(.defaultAction)
-                .shadow(color: Color.accentColor.opacity(0.45), radius: 22, y: 8)
-                .stagger(appear, delay: 0.26)
-
-                Spacer().frame(height: 48)
+                Text("Secret access layer for AI agents")
+                    .font(.kelid(16, .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .stagger(appear, delay: 0.16)
             }
-            .padding(.horizontal, 40)
+            .padding(.top, 26)
+
+            Spacer()
+
+            Button(action: onNext) {
+                HStack(spacing: 9) {
+                    Text("Get Started")
+                        .font(.kelid(15, .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.callout.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 26)
+                .padding(.vertical, 13)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .stagger(appear, delay: 0.26)
+
+            Spacer().frame(height: 48)
         }
+        .padding(.horizontal, 40)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 appear = true
@@ -61,20 +55,15 @@ struct SplashStep: View {
     }
 
     private var monoIcon: some View {
-        Image(systemName: "key.fill")
-            .font(.system(size: 58, weight: .semibold))
+        Image("KeyGlyph")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 60, height: 60)
             .foregroundStyle(.white)
             .frame(width: 128, height: 128)
-            .background {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(.white.opacity(0.06))
-                    .background(
-                        RoundedRectangle(cornerRadius: 30, style: .continuous)
-                            .stroke(.white.opacity(0.12), lineWidth: 1)
-                    )
-            }
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 30, style: .continuous))
-            .shadow(color: Color.accentColor.opacity(0.35), radius: 30, y: 12)
+            .shadow(color: .black.opacity(0.35), radius: 24, y: 14)
     }
 }
 

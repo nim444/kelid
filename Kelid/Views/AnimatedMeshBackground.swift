@@ -3,10 +3,13 @@ import SwiftUI
 /// A slow, smoothly drifting mesh gradient in the brand accent range. Sits
 /// behind onboarding content to give the dark window subtle motion.
 struct AnimatedMeshBackground: View {
-    private let base = Color(red: 0.04, green: 0.06, blue: 0.09)
-    private let accent = Color(red: 0.078, green: 0.612, blue: 0.922)
-    private let deep = Color(red: 0.05, green: 0.10, blue: 0.20)
-    private let teal = Color(red: 0.0, green: 0.42, blue: 0.45)
+    // Corners stay a deep blue (not near-black) so the gradient reads as one
+    // cohesive field with no dark ring around the edges.
+    private let corner = Color(red: 0.04, green: 0.08, blue: 0.15)
+    private let mid = Color(red: 0.05, green: 0.16, blue: 0.30)
+    private let accent = Color(red: 0.10, green: 0.45, blue: 0.78)
+    private let teal = Color(red: 0.02, green: 0.34, blue: 0.42)
+    private let glow = Color(red: 0.16, green: 0.55, blue: 0.92)
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
@@ -24,16 +27,15 @@ struct AnimatedMeshBackground: View {
                     .init(0, 1), .init(0.5, 1), .init(1, 1),
                 ],
                 colors: [
-                    base, deep, base,
-                    deep, accent.opacity(0.55), teal.opacity(0.5),
-                    base, deep, base,
+                    corner, mid, corner,
+                    mid, glow, teal,
+                    corner, accent.opacity(0.85), corner,
                 ],
                 smoothsColors: true
             )
             .ignoresSafeArea()
         }
-        .background(base)
-        .overlay(.ultraThinMaterial.opacity(0.25))
+        .background(corner)
         .ignoresSafeArea()
     }
 
