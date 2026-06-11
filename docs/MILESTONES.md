@@ -15,6 +15,114 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.2 — AI Providers UX polish (2026-06-11)
+
+**Feedback addressed.**
+- **Official brand logos.** Downloaded the real monochrome marks (OpenRouter,
+  OpenAI, Anthropic, AWS, LM Studio, Ollama) from simple-icons into
+  `Assets.xcassets/*Logo.imageset` (template-rendered, vector-preserving), tinted
+  with the brand gradient. `ProviderLogo.swift` renders them with an SF Symbol
+  fallback. Used in the provider list and pane header. SF Symbols removed from
+  provider display.
+- **Consistent buttons.** Reworked the action row into one `buttonRow` with a
+  single `.controlSize(.large)` + `.buttonBorderShape(.capsule)` applied to all
+  buttons — no more per-button manual padding making one taller than the next.
+  Save (prominent) / Test (glass) / Remove (glass destructive) now match.
+- **Test button + toast.** New `AIProviderClient.test(...)` does a cheap
+  authenticated GET per provider (OpenRouter `/key`, OpenAI/Anthropic `/models`,
+  LM Studio `/models`, Ollama `/api/tags`; AWS reports "unsupported until the
+  request engine"). Result shows as an auto-fading toast (`Toast.swift`,
+  `.toast($binding)` modifier — bottom capsule, ~1.6s fade).
+
+**Verification.** CLI build SUCCEEDED. Network entitlement already on. **No wipe.**
+
+---
+
+## Milestone 3.1 — sidebar cleanup + AI Providers (2026-06-11)
+
+**Sidebar fixes (user feedback).**
+- Removed the **duplicate** sidebar toggle — the custom button in the pane
+  toolbar is gone; only the native macOS `NavigationSplitView` toggle remains.
+- Removed the "Kelid" brand label from the sidebar top (now just clears the
+  traffic lights).
+- **Hid Vaults / Agents / Audit** from the sidebar — they require onboarding
+  that hasn't shipped. `MainSection` is now `dashboard / providers / settings`.
+
+**Providers (new System section, above Settings).** `Views/Providers/`.
+- `ProvidersView.swift` — a segmented switch (AI Providers / Communications)
+  over a two-pane layout. Communications is a `ComingSoon` placeholder (Telegram,
+  Resend, etc. for outbound notifications).
+- `AIProviderPane.swift` — per-provider config. Cloud providers (OpenRouter,
+  OpenAI, Anthropic, AWS Bedrock) take an API key with reveal toggle + remove;
+  local runtimes (LM Studio, Ollama) take a base URL. Configured/not-configured
+  status badge.
+- `Models/AIProvider.swift` — provider catalog (name, icon, auth kind, key hint,
+  default local URL, summary, keychain account).
+- `Services/ProvidersStore.swift` — `@Observable`; non-secret config (enabled,
+  baseURL) in UserDefaults, **secrets in the Keychain**.
+- `Services/KeychainStore.swift` — generic Keychain get/set/delete, service
+  `com.nim444.kelid`, `WhenUnlockedThisDeviceOnly`.
+
+**Secret storage decision.** AI provider API keys are real secrets but the vault
+engine isn't built yet. Rather than write them to disk, they go in the **macOS
+Keychain** (OS-encrypted) — consistent with Kelid's Keychain-first principle. No
+plaintext provider key ever touches disk. When the crypto core lands these can
+migrate into a Kelid vault.
+
+`ComingSoonPane(section:)` was generalized to `ComingSoon(icon:title:message:)`.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive.
+
+---
+
+## Milestone 3 — native sidebar shell + Settings (2026-06-11)
+
+**What shipped.** The post-onboarding app is now a native `NavigationSplitView`
+shell instead of a single dashboard screen.
+
+- `MainWindowView.swift` — collapsible sidebar (Dashboard / Vaults / Agents /
+  Audit, plus a System section with Settings). An always-visible toggle button
+  (`sidebar.leading`) in the detail top bar collapses/restores the sidebar with
+  animation; when collapsed it shifts clear of the traffic lights. Brand mark
+  pinned to the sidebar top via `safeAreaInset`. Status chips (Touch ID / YubiKey)
+  on the right.
+- `DashboardView.swift` — refactored into `DashboardPane` (content only; chrome
+  now lives in the shell) plus a generic `ComingSoonPane` for Vaults/Agents/Audit.
+- `Settings/SettingsView.swift` — a self-contained two-pane Settings screen with
+  a **searchable** item list (filters on title + keywords) and a detail pane.
+  Items: Change Passphrase, Recovery Code, Touch ID, YubiKey.
+- `Settings/SettingsPaneKit.swift` — shared `PaneHeader`, `PaneCard`, `PaneStatus`.
+- `Settings/ChangePassphrasePane.swift` — verify current → re-derive verifier
+  under a fresh salt → rewrite `master.json`. Recovery hash untouched.
+- `Settings/RecoveryCodePane.swift` — **honest design**: the recovery code was
+  only ever stored as a hash, so it cannot be "revealed". Confirm passphrase →
+  mint a new code (old one stops working) → show once with copy.
+- `Settings/TouchIDPane.swift` — add (LocalAuthentication check) / remove.
+- `Settings/YubiKeyPane.swift` — presence polling, PIN field + "no PIN" hatch,
+  enroll / remove (same CTAP2 path as onboarding).
+
+**MasterKeyStore additions.** `changePassphrase(current:new:)` and
+`regenerateRecoveryCode(currentPassphrase:)`, plus `MasterError.notFound` /
+`.wrongPassphrase` and private `loadRecord()` / `write()`. No change to the
+`master.json` format — purely additive.
+
+**Decisions.** Settings uses a custom HStack two-pane (not a nested
+NavigationSplitView) to keep the IBM Plex Mono / glass aesthetic and a working
+search filter. "Reveal recovery code" was reinterpreted as "regenerate" because
+the plaintext is never stored — surfaced to the user rather than faked.
+
+**Placeholders.** Vaults/Agents/Audit are empty states. Touch ID still records a
+verified biometric check, not yet a keyslot binding. Settings does not yet require
+re-auth to *open* (only mutations verify the passphrase).
+
+**Verification.** CLI build SUCCEEDED. User to build/run in Xcode and exercise the
+sidebar toggle + each Settings pane.
+
+**Wipe.** Not needed — additive only, `master.json` format unchanged. Existing
+onboarding data stays valid.
+
+---
+
 ## Milestone 2.8 — fix attestation parse + on-disk data audit (2026-06-11)
 
 **Bug fixed.** PIN enrollment got past the handshake but failed with "no authData

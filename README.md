@@ -27,6 +27,26 @@ as one native Swift app: Touch ID and Keychain as first-class primitives, a smal
 auth-gated command surface, no silent security defaults, and a macOS-native interface instead
 of a webview.
 
+## What works today
+
+Built step by step; every step is logged in [docs/MILESTONES.md](docs/MILESTONES.md).
+
+- **Onboarding** — Splash → Terms → Set Passphrase → Recovery Code → Touch ID → YubiKey.
+  Liquid Glass / macOS 27 styling, IBM Plex Mono, animated neutral gradient.
+- **Master record** — salted iterated-SHA-256 verifier and a hashed recovery code only;
+  no plaintext passphrase, recovery code, or secret on disk (interim until the crypto core).
+- **YubiKey** — dependency-free native CTAP2/FIDO2 over USB HID: `getInfo`, full clientPIN v1
+  (ECDH P-256, AES-CBC, pinUvAuthToken), and `makeCredential` with the `hmac-secret` extension.
+- **Touch ID** — LocalAuthentication unlock check.
+- **App shell** — native collapsible `NavigationSplitView` sidebar (Dashboard + a System group).
+- **Settings** — searchable two-pane: change passphrase, regenerate recovery code, add/remove
+  Touch ID, enroll/remove YubiKey.
+- **Providers → AI Providers** — OpenRouter, OpenAI, Anthropic, AWS Bedrock, LM Studio, Ollama
+  with official logos; keys stored in the macOS Keychain (never plaintext on disk), a Test
+  connectivity check, and toast feedback. Communications channels are next.
+
+Vaults, Agents, and Audit are hidden until their engines ship.
+
 ## License
 
 **PolyForm Noncommercial 1.0.0** — free for personal, academic, and non-profit use;

@@ -1,104 +1,51 @@
 import SwiftUI
 
-/// Main panel after onboarding. Milestone-1: layout and empty states only —
-/// the vault engine, agents, and audit log arrive in the next milestones.
-struct DashboardView: View {
-    @Environment(AppStore.self) private var store
-
+/// Dashboard detail pane — stat cards and empty states. The window chrome and
+/// sidebar are provided by MainWindowView.
+struct DashboardPane: View {
     private let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16),
     ]
 
     var body: some View {
-        VStack(spacing: 18) {
-            header
-
-            LazyVGrid(columns: columns, spacing: 16) {
-                statCard(
-                    icon: "shippingbox",
-                    title: "Vaults",
-                    value: "0",
-                    hint: "Create your first vault — next milestone"
-                )
-                statCard(
-                    icon: "key.horizontal",
-                    title: "Secrets",
-                    value: "0",
-                    hint: "Secrets live inside vaults"
-                )
-                statCard(
-                    icon: "cpu",
-                    title: "Agents",
-                    value: "0",
-                    hint: "Agents connect over MCP"
-                )
-                statCard(
-                    icon: "list.bullet.rectangle",
-                    title: "Audit Events",
-                    value: "0",
-                    hint: "Every request is recorded"
-                )
-            }
-
-            Spacer()
-
-            Text("Milestone 1 — onboarding scaffold. The vault engine is next.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 4)
-        }
-        .padding(20)
-        .padding(.top, 6)
-        .frame(minWidth: 760, maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
-        .kelidWindowBackground()
-        .background(WindowConfigurator(hideSystemButtons: false))
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "key.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(LinearGradient.kelidAccent)
-                Text("Kelid")
-                    .font(.headline)
-                HStack(spacing: 5) {
-                    Circle().fill(.green).frame(width: 7, height: 7)
-                    Text("Set up")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 18) {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    statCard(
+                        icon: "shippingbox",
+                        title: "Vaults",
+                        value: "0",
+                        hint: "Create your first vault — next milestone"
+                    )
+                    statCard(
+                        icon: "key.horizontal",
+                        title: "Secrets",
+                        value: "0",
+                        hint: "Secrets live inside vaults"
+                    )
+                    statCard(
+                        icon: "cpu",
+                        title: "Agents",
+                        value: "0",
+                        hint: "Agents connect over MCP"
+                    )
+                    statCard(
+                        icon: "list.bullet.rectangle",
+                        title: "Audit Events",
+                        value: "0",
+                        hint: "Every request is recorded"
+                    )
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .glassEffect(.regular, in: .capsule)
 
-            Spacer()
-
-            HStack(spacing: 6) {
-                if store.touchIDEnrolled {
-                    Label("Touch ID", systemImage: "touchid")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .help("Touch ID unlock is enabled")
-                }
-                if YubiKeyService.isEnrolled {
-                    Label("YubiKey", systemImage: "key.radiowaves.forward")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .help("A hardware security key is enrolled")
-                }
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13))
+                Text("Milestone 1 — onboarding scaffold. The vault engine is next.")
+                    .font(.kelid(11, .regular))
                     .foregroundStyle(.tertiary)
-                    .help("Settings arrive with the vault engine")
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 4)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .glassEffect(.regular, in: .capsule)
+            .padding(24)
         }
-        .padding(.leading, 66) // keep clear of the traffic lights
     }
 
     private func statCard(icon: String, title: String, value: String, hint: String) -> some View {
@@ -108,17 +55,46 @@ struct DashboardView: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(LinearGradient.kelidAccent)
                 Text(title)
-                    .font(.headline)
+                    .font(.kelid(15, .semibold))
                 Spacer()
             }
             Text(value)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
             Text(hint)
-                .font(.caption)
+                .font(.kelid(12, .regular))
                 .foregroundStyle(.secondary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: .rect(cornerRadius: 18))
+    }
+}
+
+/// Generic empty state for sections whose engine has not shipped yet.
+struct ComingSoon: View {
+    let icon: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(LinearGradient.kelidAccent)
+            Text(title)
+                .font(.kelid(22, .bold))
+            Text(message)
+                .font(.kelid(13, .regular))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+            Text("Coming soon")
+                .font(.kelid(11, .semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .glassEffect(.regular, in: .capsule)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

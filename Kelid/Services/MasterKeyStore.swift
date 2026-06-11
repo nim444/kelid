@@ -19,11 +19,15 @@ enum MasterKeyStore {
 
     enum MasterError: LocalizedError {
         case alreadyExists
+        case notFound
+        case wrongPassphrase
         case storageFailed(String)
 
         var errorDescription: String? {
             switch self {
             case .alreadyExists: "A master passphrase already exists."
+            case .notFound: "No master passphrase is set up yet."
+            case .wrongPassphrase: "That current passphrase is not correct."
             case .storageFailed(let why): "Could not store the master record: \(why)"
             }
         }
@@ -89,7 +93,59 @@ enum MasterKeyStore {
         return constantTimeEquals(candidate, stored)
     }
 
+    // MARK: - Mutations (Settings)
+
+    /// Re-derives the verifier under a fresh salt for a new passphrase.
+    /// Verifies the current passphrase first; the recovery hash is untouched.
+    static func changePassphrase(current: String, new: String) async throws {
+        guard masterExists else { throw MasterError.notFound }
+        guard await verify(passphrase: current) else { throw MasterError.wrongPassphrase }
+
+        var record = try loadRecord()
+        let salt = randomBytes(16)
+        let verifier = await Task.detached(priority: .userInitiated) {
+            deriveVerifier(passphrase: new, salt: salt)
+        }.value
+        record.saltBase64 = salt.base64EncodedString()
+        record.verifierBase64 = verifier.base64EncodedString()
+        record.iterations = iterations
+        try write(record)
+    }
+
+    /// Mints a brand-new recovery code, stores only its hash, and returns the
+    /// code to show once. Requires the current passphrase — the old code (which
+    /// was never stored in plaintext) stops working immediately.
+    static func regenerateRecoveryCode(currentPassphrase: String) async throws -> String {
+        guard masterExists else { throw MasterError.notFound }
+        guard await verify(passphrase: currentPassphrase) else { throw MasterError.wrongPassphrase }
+
+        var record = try loadRecord()
+        let code = generateRecoveryCode()
+        let hash = Data(SHA256.hash(data: Data(code.utf8)))
+        record.recoveryHashBase64 = hash.base64EncodedString()
+        try write(record)
+        return code
+    }
+
     // MARK: - Helpers
+
+    private static func loadRecord() throws -> MasterRecord {
+        guard let data = try? Data(contentsOf: recordURL),
+              let record = try? JSONDecoder().decode(MasterRecord.self, from: data)
+        else { throw MasterError.storageFailed("Could not read the master record.") }
+        return record
+    }
+
+    private static func write(_ record: MasterRecord) throws {
+        do {
+            try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
+            let data = try JSONEncoder().encode(record)
+            try data.write(to: recordURL, options: [.atomic])
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
+        } catch {
+            throw MasterError.storageFailed(error.localizedDescription)
+        }
+    }
 
     private nonisolated static func deriveVerifier(passphrase: String, salt: Data) -> Data {
         var digest = Data(salt + Data(passphrase.utf8))
