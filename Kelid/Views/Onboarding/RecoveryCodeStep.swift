@@ -8,12 +8,6 @@ struct RecoveryCodeStep: View {
     @State private var saved = false
     @State private var copied = false
 
-    private var groups: [String] {
-        code.split(separator: "-").map(String.init)
-    }
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
-
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "key.viewfinder")
@@ -29,24 +23,22 @@ struct RecoveryCodeStep: View {
                     .multilineTextAlignment(.center)
             }
 
-            // Code as a grid of monospace chips — two rows of four.
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                    Text(group)
-                        .font(.kelid(17, .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(.regularMaterial, in: .rect(cornerRadius: 10, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(.primary.opacity(0.06), lineWidth: 1)
-                        )
-                }
-            }
-            .frame(maxWidth: 440)
-            .textSelection(.enabled)
+            // The full code on a single row, in one box.
+            Text(code)
+                .font(.kelid(16, .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .background(.regularMaterial, in: .rect(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(.primary.opacity(0.08), lineWidth: 1)
+                )
+                .frame(maxWidth: 520)
 
             Button {
                 copy()
