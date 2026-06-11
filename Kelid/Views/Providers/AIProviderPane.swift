@@ -59,27 +59,29 @@ struct AIProviderPane: View {
             HStack(spacing: 8) {
                 Group {
                     if revealKey {
-                        TextField(provider.keyHint, text: $key)
+                        TextField(keyFieldPrompt, text: $key)
                     } else {
-                        SecureField(provider.keyHint, text: $key)
+                        SecureField(keyFieldPrompt, text: $key)
                     }
                 }
                 .textFieldStyle(.roundedBorder)
                 .font(.kelid(13, .regular))
 
                 Button {
-                    revealKey.toggle()
+                    toggleReveal()
                 } label: {
                     Image(systemName: revealKey ? "eye.slash" : "eye")
                         .frame(width: 18)
                 }
                 .buttonStyle(.glass)
                 .controlSize(.large)
+                .help(revealKey ? "Hide" : "Reveal stored key (requires Touch ID)")
             }
 
-            Text("Stored in the macOS Keychain — never written to disk in plaintext.")
+            Text("Stored in the macOS Keychain — never written to disk in plaintext. Revealing a saved key requires Touch ID or your Mac password.")
                 .font(.kelid(11, .regular))
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
 
             buttonRow
         }
@@ -153,7 +155,7 @@ struct AIProviderPane: View {
     private var canTest: Bool {
         guard !testing else { return false }
         switch provider.auth {
-        case .apiKey: return !trimmedKey.isEmpty
+        case .apiKey: return !trimmedKey.isEmpty || store.hasKey(provider)
         case .localEndpoint: return !baseURL.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
@@ -175,17 +177,54 @@ struct AIProviderPane: View {
 
     // MARK: - Actions
 
+    /// The stored key is never auto-loaded into memory — the field stays empty
+    /// until the user types a new key or authenticates to reveal the saved one.
     private func load() {
-        key = store.apiKey(for: provider) ?? ""
+        key = ""
         let cfg = store.config(for: provider)
         baseURL = cfg.baseURL.isEmpty ? provider.defaultBaseURL : cfg.baseURL
         revealKey = false
+    }
+
+    private var keyFieldPrompt: String {
+        if key.isEmpty && store.hasKey(provider) {
+            return "Saved — type to replace, or reveal"
+        }
+        return provider.keyHint
+    }
+
+    private func toggleReveal() {
+        if revealKey {
+            // Hiding again: if the field holds the stored key (not a fresh
+            // entry), drop it from memory too.
+            revealKey = false
+            if key == store.apiKey(for: provider) { key = "" }
+            return
+        }
+        // Revealing the stored key requires user presence.
+        if key.isEmpty, store.hasKey(provider) {
+            Task {
+                let ok = await TouchIDService.requireUserPresence(
+                    reason: "reveal the \(provider.name) API key"
+                )
+                if ok {
+                    key = store.apiKey(for: provider) ?? ""
+                    revealKey = true
+                } else {
+                    toast = .error("Authentication required to reveal the key")
+                }
+            }
+        } else {
+            revealKey = true
+        }
     }
 
     private func save() {
         switch provider.auth {
         case .apiKey:
             store.setAPIKey(trimmedKey, for: provider)
+            key = ""
+            revealKey = false
             toast = .success("\(provider.name) key saved")
         case .localEndpoint:
             store.setBaseURL(baseURL.trimmingCharacters(in: .whitespaces), for: provider)
@@ -201,7 +240,9 @@ struct AIProviderPane: View {
 
     private func runTest() {
         testing = true
-        let testKey = trimmedKey
+        // Field empty but a key is saved: use the stored key transiently,
+        // without ever displaying it.
+        let testKey = trimmedKey.isEmpty ? (store.apiKey(for: provider) ?? "") : trimmedKey
         let testURL = baseURL.trimmingCharacters(in: .whitespaces)
         Task {
             let result = await AIProviderClient.test(provider, key: testKey, baseURL: testURL)

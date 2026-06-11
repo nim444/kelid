@@ -62,8 +62,13 @@ nonisolated enum CtapPinProtocol {
         }
 
         // 3. pinHashEnc = AES-256-CBC(sharedSecret, IV0, LEFT16(SHA-256(pin))).
-        let pinHash = Array(SHA256.hash(data: Data(pin.utf8)).prefix(16))
-        let sharedBytes = shared.withUnsafeBytes { Array($0) }
+        // Best-effort zeroization of key material once the handshake finishes.
+        var pinHash = Array(SHA256.hash(data: Data(pin.utf8)).prefix(16))
+        var sharedBytes = shared.withUnsafeBytes { Array($0) }
+        defer {
+            for i in pinHash.indices { pinHash[i] = 0 }
+            for i in sharedBytes.indices { sharedBytes[i] = 0 }
+        }
         let pinHashEnc = try aesCBC(key: sharedBytes, data: pinHash, encrypt: true)
 
         // 4. getPINToken.

@@ -110,6 +110,7 @@ struct RecoveryCodePane: View {
         Task {
             do {
                 let code = try await MasterKeyStore.regenerateRecoveryCode(currentPassphrase: passphrase)
+                passphrase = "" // drop from memory as soon as it has been used
                 newCode = code
             } catch {
                 status = (.error, error.localizedDescription)

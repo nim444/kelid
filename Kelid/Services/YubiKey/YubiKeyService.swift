@@ -221,6 +221,7 @@ nonisolated enum YubiKeyService {
     private nonisolated static func save(_ enrollment: Enrollment) throws {
         let dir = recordURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         let data = try JSONEncoder().encode(enrollment)
         try data.write(to: recordURL, options: [.atomic])
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)

@@ -1,15 +1,17 @@
+import CommonCrypto
 import CryptoKit
 import Foundation
 
 /// Creates and verifies the master passphrase record and issues the one-time
 /// recovery code.
 ///
-/// Milestone-1 scaffold: the stored verifier is salted iterated SHA-256.
-/// This is a stand-in until the crypto core lands (Argon2id keyslots and
-/// vault DEKs wrapped under the master key — see docs/svault-export/architecture.md).
-/// Nothing here is presented as final crypto.
+/// Verifier: PBKDF2-HMAC-SHA256, 600k rounds (OWASP 2023), 32-byte salt, via
+/// CommonCrypto's vetted implementation. One-way only — the passphrase itself
+/// is never stored. The crypto core milestone layers Argon2id keyslots and
+/// vault DEKs on top (see docs/svault-export/architecture.md).
 enum MasterKeyStore {
     struct MasterRecord: Codable {
+        var kdf: String
         var saltBase64: String
         var verifierBase64: String
         var recoveryHashBase64: String
@@ -33,7 +35,8 @@ enum MasterKeyStore {
         }
     }
 
-    private nonisolated static let iterations = 120_000
+    private nonisolated static let iterations = 600_000
+    private nonisolated static let kdfName = "pbkdf2-hmac-sha256"
 
     private static var supportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -53,42 +56,37 @@ enum MasterKeyStore {
     static func create(passphrase: String) async throws -> String {
         guard !masterExists else { throw MasterError.alreadyExists }
 
-        let salt = randomBytes(16)
+        let salt = randomBytes(32)
         let verifier = await Task.detached(priority: .userInitiated) {
-            deriveVerifier(passphrase: passphrase, salt: salt)
+            deriveVerifier(passphrase: passphrase, salt: salt, rounds: iterations)
         }.value
 
         let recoveryCode = generateRecoveryCode()
         let recoveryHash = Data(SHA256.hash(data: Data(recoveryCode.utf8)))
 
         let record = MasterRecord(
+            kdf: kdfName,
             saltBase64: salt.base64EncodedString(),
             verifierBase64: verifier.base64EncodedString(),
             recoveryHashBase64: recoveryHash.base64EncodedString(),
             iterations: iterations,
             createdAt: .now
         )
-
-        do {
-            try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(record)
-            try data.write(to: recordURL, options: [.atomic])
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
-        } catch {
-            throw MasterError.storageFailed(error.localizedDescription)
-        }
+        try write(record)
         return recoveryCode
     }
 
     static func verify(passphrase: String) async -> Bool {
         guard let data = try? Data(contentsOf: recordURL),
               let record = try? JSONDecoder().decode(MasterRecord.self, from: data),
+              record.kdf == kdfName,
               let salt = Data(base64Encoded: record.saltBase64),
               let stored = Data(base64Encoded: record.verifierBase64)
         else { return false }
 
+        let rounds = record.iterations
         let candidate = await Task.detached(priority: .userInitiated) {
-            deriveVerifier(passphrase: passphrase, salt: salt)
+            deriveVerifier(passphrase: passphrase, salt: salt, rounds: rounds)
         }.value
         return constantTimeEquals(candidate, stored)
     }
@@ -102,10 +100,11 @@ enum MasterKeyStore {
         guard await verify(passphrase: current) else { throw MasterError.wrongPassphrase }
 
         var record = try loadRecord()
-        let salt = randomBytes(16)
+        let salt = randomBytes(32)
         let verifier = await Task.detached(priority: .userInitiated) {
-            deriveVerifier(passphrase: new, salt: salt)
+            deriveVerifier(passphrase: new, salt: salt, rounds: iterations)
         }.value
+        record.kdf = kdfName
         record.saltBase64 = salt.base64EncodedString()
         record.verifierBase64 = verifier.base64EncodedString()
         record.iterations = iterations
@@ -139,6 +138,7 @@ enum MasterKeyStore {
     private static func write(_ record: MasterRecord) throws {
         do {
             try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: supportDirectory.path)
             let data = try JSONEncoder().encode(record)
             try data.write(to: recordURL, options: [.atomic])
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
@@ -147,12 +147,20 @@ enum MasterKeyStore {
         }
     }
 
-    private nonisolated static func deriveVerifier(passphrase: String, salt: Data) -> Data {
-        var digest = Data(salt + Data(passphrase.utf8))
-        for _ in 0..<iterations {
-            digest = Data(SHA256.hash(data: digest))
-        }
-        return digest
+    /// PBKDF2-HMAC-SHA256 via CommonCrypto (vetted, FIPS-validated path).
+    private nonisolated static func deriveVerifier(passphrase: String, salt: Data, rounds: Int) -> Data {
+        var out = [UInt8](repeating: 0, count: 32)
+        let saltBytes = [UInt8](salt)
+        let status = CCKeyDerivationPBKDF(
+            CCPBKDFAlgorithm(kCCPBKDF2),
+            passphrase, passphrase.utf8.count,
+            saltBytes, saltBytes.count,
+            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+            UInt32(rounds),
+            &out, out.count
+        )
+        precondition(status == kCCSuccess, "PBKDF2 derivation failed (\(status))")
+        return Data(out)
     }
 
     private nonisolated static func constantTimeEquals(_ a: Data, _ b: Data) -> Bool {
@@ -169,20 +177,29 @@ enum MasterKeyStore {
     }
 
     /// 8 groups of 4 from an unambiguous alphabet (no I, L, O, 0, 1).
+    /// Rejection sampling keeps every character exactly equiprobable.
     private nonisolated static func generateRecoveryCode() -> String {
         let alphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
         var groups: [String] = []
         for _ in 0..<8 {
             var group = ""
             for _ in 0..<4 {
-                var index: UInt32 = 0
-                _ = withUnsafeMutableBytes(of: &index) {
-                    SecRandomCopyBytes(kSecRandomDefault, 4, $0.baseAddress!)
-                }
-                group.append(alphabet[Int(index) % alphabet.count])
+                group.append(alphabet[uniformRandom(below: alphabet.count)])
             }
             groups.append(group)
         }
         return groups.joined(separator: "-")
+    }
+
+    /// Unbiased random index in 0..<bound via rejection sampling.
+    private nonisolated static func uniformRandom(below bound: Int) -> Int {
+        let limit = 256 - (256 % bound)
+        while true {
+            var byte: UInt8 = 0
+            _ = withUnsafeMutableBytes(of: &byte) {
+                SecRandomCopyBytes(kSecRandomDefault, 1, $0.baseAddress!)
+            }
+            if Int(byte) < limit { return Int(byte) % bound }
+        }
     }
 }

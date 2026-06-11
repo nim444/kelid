@@ -147,6 +147,7 @@ struct YubiKeyStep: View {
             do {
                 _ = try await YubiKeyService.enroll(pin: pinValue)
                 enrolled = true
+                pin = "" // drop the PIN from memory once it has served its purpose
             } catch {
                 errorMessage = error.localizedDescription
             }

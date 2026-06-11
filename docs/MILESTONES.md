@@ -15,6 +15,51 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.4 — maximum-hardening pass (2026-06-11)
+
+User call: close every gap that can be closed natively before moving on. Wipe
+approved, so no legacy compatibility kept.
+
+**KDF upgraded.** Master verifier is now **PBKDF2-HMAC-SHA256, 600,000 rounds**
+(OWASP 2023 recommendation) via CommonCrypto's vetted implementation — replaces
+the interim naive iterated SHA-256. Salt widened 16 → 32 bytes. `master.json`
+gains a `kdf` field; `verify` refuses records whose kdf does not match (no
+silent legacy path). Argon2id remains a crypto-core candidate via a vetted
+library — hand-rolling it was rejected on principle.
+
+**Hardened Runtime enabled** (both configs) — blocks DYLD injection, unsigned
+library loading, and debugger attachment in release builds.
+
+**Provider key reveal gated.** The stored API key is no longer auto-loaded into
+view state when the pane opens. The field stays empty ("Saved — type to
+replace, or reveal"); revealing the saved key requires **Touch ID or the Mac
+password** (`LAPolicy.deviceOwnerAuthentication` via
+`TouchIDService.requireUserPresence`). After Save the field clears; hiding a
+revealed key drops it from state. Test falls back to the stored key
+transiently without displaying it.
+
+**Memory hygiene (best effort within Swift).**
+- CtapPinProtocol zeroes the ECDH shared secret + PIN hash buffers on exit.
+- YubiKey PIN fields cleared after successful enrollment (onboarding + Settings).
+- Recovery-code pane clears the passphrase immediately after use.
+- ChangePassphrase already cleared its fields; PassphraseStep state dies with
+  the view.
+
+**Misc.** Recovery code now uses rejection sampling (zero modulo bias). Data
+directory forced to 0700 in both write paths (master + yubikey records).
+
+**Deliberate non-changes.** `NSWindow.sharingType = .none` (screenshot
+exclusion) was considered and skipped — it would also block the user's own
+dev screenshots; candidate for a later "screen privacy" toggle. In-app
+verify rate-limiting skipped as theater: a same-UID attacker brute-forces
+`master.json` offline anyway; the 600k-round KDF is the real defense.
+
+**Verification.** CLI build SUCCEEDED. **Wiped** (user-approved): container
+data + defaults gone, cfprefsd flushed. The OpenRouter key remains in the
+Keychain (encrypted, still valid). Fresh onboarding required.
+
+---
+
 ## Milestone 3.3 — deep security audit of the unlock path (2026-06-11)
 
 Full review of every file in the passphrase / recovery / Touch ID / YubiKey /
