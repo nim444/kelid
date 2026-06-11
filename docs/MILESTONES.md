@@ -15,6 +15,27 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.8 — fix attestation parse + on-disk data audit (2026-06-11)
+
+**Bug fixed.** PIN enrollment got past the handshake but failed with "no authData
+in attestation". Cause: the CTAP2 makeCredential response keys `authData` at map
+key **0x02** (0x01 is `fmt`, a string), but `parseCredentialID` read 0x01. Changed
+to 0x02. PIN flow + credential parse should now complete.
+
+**Security audit (user asked: any unencrypted data on disk?).** Inspected the
+sandbox container. Only file written is `master.json`, containing exclusively
+one-way material: a random salt, a salted-iterated SHA-256 **verifier** (not the
+passphrase — irreversible), a SHA-256 **hash of the recovery code** (not the
+code), plus iterations/timestamp. No plaintext passphrase, recovery code, or
+secret anywhere. Kelid stores **no user secrets yet** (no vaults), so there's
+nothing that should be encrypted-but-isn't. Password verifiers are stored as
+hashes by design. Real secret encryption (AES-256-GCM under a passphrase-derived
+key) arrives with the crypto core.
+
+**Wipe.** Done — container swept, zero data files remain.
+
+---
+
 ## Milestone 2.7 — YubiKey PIN support (CTAP2 clientPIN) (2026-06-11)
 
 **Goal.** The user's key has a PIN, which milestone-2 enrollment couldn't handle.

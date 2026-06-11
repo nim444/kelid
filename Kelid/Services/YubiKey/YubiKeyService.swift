@@ -181,11 +181,12 @@ nonisolated enum YubiKeyService {
     }
 
     /// Pulls the credential id out of the attestation object's authData.
+    /// makeCredential response: 0x01 fmt, 0x02 authData, 0x03 attStmt.
     /// authData layout: rpIdHash(32) flags(1) signCount(4) then
     /// attestedCredentialData = aaguid(16) credIdLen(2 BE) credId(L) ...
     private nonisolated static func parseCredentialID(from response: [UInt8]) throws -> (id: [UInt8], aaguid: [UInt8]) {
         guard let attestation = try? CBOR.decode(response),
-              let authData = attestation.mapValue(forInt: 1)?.bytesValue
+              let authData = attestation.mapValue(forInt: 2)?.bytesValue
         else { throw EnrollError.failed("no authData in attestation") }
 
         let credDataStart = 37 // 32 + 1 + 4
