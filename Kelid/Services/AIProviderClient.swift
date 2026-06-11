@@ -37,6 +37,10 @@ enum AIProviderClient {
         return b + path
     }
 
+    /// Ephemeral session: no disk cache, no cookies — nothing about an
+    /// authenticated request is ever written to disk.
+    private static let session = URLSession(configuration: .ephemeral)
+
     private static func get(_ urlString: String, bearer: String? = nil, headers: [String: String] = [:]) async -> TestResult {
         guard let url = URL(string: urlString) else { return .failed("Invalid endpoint URL.") }
         var request = URLRequest(url: url)
@@ -46,7 +50,7 @@ enum AIProviderClient {
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
 
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { return .failed("No response.") }
             switch http.statusCode {
             case 200...299: return .ok("Connection verified.")

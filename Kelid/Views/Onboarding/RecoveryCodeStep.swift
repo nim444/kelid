@@ -92,6 +92,8 @@ struct RecoveryCodeStep: View {
 
     private func copy() {
         NSPasteboard.general.clearContents()
+        // Concealed marker: clipboard managers must not archive this value.
+        NSPasteboard.general.setString("", forType: .init("org.nspasteboard.ConcealedType"))
         NSPasteboard.general.setString(code, forType: .string)
         copied = true
         Task {

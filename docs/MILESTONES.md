@@ -15,6 +15,49 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.3 — deep security audit of the unlock path (2026-06-11)
+
+Full review of every file in the passphrase / recovery / Touch ID / YubiKey /
+provider-key path, plus inspection of every artifact actually persisted on disk.
+
+**Verified clean.**
+- `master.json` (0600): salt + iterated-SHA-256 verifier + recovery-code hash
+  only — all one-way, nothing reversible.
+- `yubikey.json` (0600): credential ID + AAGUID + rpID — public values by FIDO
+  design, not secrets.
+- UserDefaults: booleans, window frames, provider `{enabled, baseURL}` — decoded
+  the actual plist blob to confirm no key material.
+- Provider API keys: Keychain only (`WhenUnlockedThisDeviceOnly`, no iCloud
+  sync); confirmed via `security find-generic-password`.
+- No `print`/`NSLog`/`os_log` anywhere — no secret can leak into logs.
+- Passphrase: SecureField → create/verify only; constant-time verifier compare.
+- CTAP2 PIN: never crosses USB in plaintext — LEFT16(SHA-256(pin)) encrypted
+  with AES-256-CBC under the ECDH(P-256) shared secret per clientPIN v1;
+  pinUvAuthToken lives only in memory.
+- Recovery code: SecRandomCopyBytes, shown once, onboarding @State cleared on
+  Continue.
+- Sandbox on; entitlements limited to USB + outgoing network.
+
+**Hardenings applied.**
+- Recovery-code copy now sets `org.nspasteboard.ConcealedType` (onboarding +
+  Settings) so clipboard managers do not archive the code.
+- `AIProviderClient` uses an **ephemeral URLSession** — no disk cache or cookies
+  from authenticated test requests.
+
+**Known interim gaps (documented, by design until the crypto core).**
+- Verifier KDF is iterated SHA-256 (120k), not Argon2id yet.
+- Touch ID is a verified UI gate, not a cryptographic keyslot binding.
+- YubiKey credential enrolled but hmac-secret does not wrap anything yet.
+- Swift cannot deterministically zero String memory (platform limitation).
+- Provider key "reveal" has no re-auth gate yet (candidate: Touch ID before
+  reveal). The same-UID boundary remains as stated everywhere.
+- Recovery-code alphabet sampling has a negligible modulo bias — switch to
+  rejection sampling in the crypto core milestone.
+
+**Verification.** CLI build SUCCEEDED. **No wipe.**
+
+---
+
 ## Milestone 3.2 — AI Providers UX polish (2026-06-11)
 
 **Feedback addressed.**

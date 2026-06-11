@@ -79,6 +79,8 @@ struct RecoveryCodePane: View {
             HStack(spacing: 10) {
                 Button {
                     NSPasteboard.general.clearContents()
+                    // Concealed marker: clipboard managers must not archive this value.
+                    NSPasteboard.general.setString("", forType: .init("org.nspasteboard.ConcealedType"))
                     NSPasteboard.general.setString(code, forType: .string)
                     copied = true
                     Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
