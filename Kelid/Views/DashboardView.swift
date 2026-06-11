@@ -83,6 +83,12 @@ struct DashboardView: View {
                         .foregroundStyle(.secondary)
                         .help("Touch ID unlock is enabled")
                 }
+                if YubiKeyService.isEnrolled {
+                    Label("YubiKey", systemImage: "key.radiowaves.forward")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("A hardware security key is enrolled")
+                }
                 Image(systemName: "gearshape")
                     .font(.system(size: 13))
                     .foregroundStyle(.tertiary)
