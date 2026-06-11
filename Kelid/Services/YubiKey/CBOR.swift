@@ -171,6 +171,19 @@ nonisolated extension CBOR.Value {
         return nil
     }
 
+    /// Look up a map entry by a possibly-negative integer key (COSE uses -1/-2/-3).
+    func value(forKey key: Int) -> CBOR.Value? {
+        guard case .map(let pairs) = self else { return nil }
+        for (k, v) in pairs {
+            switch k {
+            case .unsigned(let n) where Int(exactly: n) == key: return v
+            case .negative(let n) where Int(exactly: n) == key: return v
+            default: continue
+            }
+        }
+        return nil
+    }
+
     var bytesValue: [UInt8]? {
         if case .bytes(let b) = self { return b }
         return nil

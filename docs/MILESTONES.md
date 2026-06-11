@@ -15,6 +15,36 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.7 — YubiKey PIN support (CTAP2 clientPIN) (2026-06-11)
+
+**Goal.** The user's key has a PIN, which milestone-2 enrollment couldn't handle.
+Implement the CTAP2 PIN/UV Auth Protocol so PIN-protected keys enroll.
+
+**What shipped.**
+- `Kelid/Services/YubiKey/CtapPinProtocol.swift` — PIN/UV Auth Protocol **v1**:
+  ECDH P-256 key agreement with the authenticator (CryptoKit), v1 KDF
+  (`sharedSecret = SHA-256(ECDH-X)`), AES-256-CBC zero-IV no-padding via
+  CommonCrypto for `pinHashEnc`/token decrypt, COSE_Key encode/decode (negative
+  integer keys), `getKeyAgreement` + `getPinToken` subcommands, and
+  `pinUvAuthParam = LEFT16(HMAC-SHA-256(token, clientDataHash))`. Maps key status
+  bytes (0x31 invalid, 0x32/0x34 blocked) to readable errors.
+- `YubiKeyService` — `readInfo` now reports `clientPin` (PIN set?) + hmac-secret
+  from getInfo `options`/`extensions`; `enroll(pin:)` runs the PIN handshake when
+  needed and adds `pinUvAuthParam` (0x08) + `pinUvAuthProtocol` (0x09) to
+  `makeCredential`. New `EnrollError.needsPIN`.
+- `CBOR.Value.value(forKey:)` — lookup by signed integer key (COSE -1/-2/-3).
+- `YubiKeyStep` — PIN `SecureField` + a "My key has no PIN" checkbox; **Enroll
+  stays disabled until the user enters a PIN or ticks "no PIN"** (as requested).
+  IBM Plex Mono throughout, capsule glass buttons.
+
+**Limitations.** v1 only (not v2 / HKDF); no PIN-change/set flow; the token is
+used for enrollment but not yet to wrap the master keyslot (crypto-core milestone).
+
+**Wipe.** Done — wiped the sandbox container (`master.json`, `yubikey.json`,
+prefs, cfprefsd flushed) so the user can test from scratch.
+
+---
+
 ## Milestone 2.6 — neutral gradient + recovery redesign (2026-06-11)
 
 **What shipped (feedback round).**

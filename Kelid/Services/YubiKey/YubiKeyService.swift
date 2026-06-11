@@ -19,7 +19,7 @@ nonisolated enum YubiKeyService {
 
     enum EnrollError: LocalizedError {
         case notPresent
-        case userVerificationRequired
+        case needsPIN
         case noHmacSecretSupport
         case failed(String)
 
@@ -27,8 +27,8 @@ nonisolated enum YubiKeyService {
             switch self {
             case .notPresent:
                 "No security key detected. Insert your YubiKey and try again."
-            case .userVerificationRequired:
-                "This key requires a PIN. PIN-protected enrollment arrives in a later milestone."
+            case .needsPIN:
+                "This key has a PIN. Enter it above, then enroll."
             case .noHmacSecretSupport:
                 "This security key does not support the hmac-secret extension Kelid needs."
             case .failed(let why):
@@ -50,14 +50,14 @@ nonisolated enum YubiKeyService {
     }
 
     /// Runs the full enrollment off the main actor (USB I/O blocks on the
-    /// user's touch). Returns the stored enrollment record.
-    static func enroll() async throws -> Enrollment {
+    /// user's touch). Pass the key's PIN if it has one, else nil.
+    static func enroll(pin: String?) async throws -> Enrollment {
         try await Task.detached(priority: .userInitiated) {
-            try runEnroll()
+            try runEnroll(pin: pin)
         }.value
     }
 
-    private nonisolated static func runEnroll() throws -> Enrollment {
+    private nonisolated static func runEnroll(pin: String?) throws -> Enrollment {
         guard FidoHidDevice.isKeyPresent else { throw EnrollError.notPresent }
 
         let device: FidoHidDevice
@@ -67,32 +67,58 @@ nonisolated enum YubiKeyService {
             throw EnrollError.failed(error.localizedDescription)
         }
 
-        try assertHmacSecret(device)
-        return try makeCredential(device)
+        let info = try readInfo(device)
+        if !info.supportsHmacSecret { throw EnrollError.noHmacSecretSupport }
+        if info.clientPinSet, pin == nil { throw EnrollError.needsPIN }
+
+        // PIN-protected key: get a pinUvAuthToken first.
+        var pinToken: Data?
+        if let pin, info.clientPinSet {
+            pinToken = try CtapPinProtocol.establishToken(device: device, pin: pin)
+        }
+
+        return try makeCredential(device, pinToken: pinToken)
     }
 
     // MARK: - getInfo
 
-    private nonisolated static func assertHmacSecret(_ device: FidoHidDevice) throws {
+    private struct AuthenticatorInfo {
+        var supportsHmacSecret: Bool
+        var clientPinSet: Bool
+    }
+
+    private nonisolated static func readInfo(_ device: FidoHidDevice) throws -> AuthenticatorInfo {
         let response: [UInt8]
         do {
             response = try device.sendCBOR(command: CtapCmd.getInfo, body: [])
         } catch {
             throw EnrollError.failed(error.localizedDescription)
         }
-        guard let info = try? CBOR.decode(response),
-              case .array(let extensions)? = info.mapValue(forInt: 2)
-        else { return } // older keys omit the list; let makeCredential be the real test
-
-        let names = extensions.compactMap { if case .text(let s) = $0 { return s } else { return nil } }
-        if !names.isEmpty, !names.contains("hmac-secret") {
-            throw EnrollError.noHmacSecretSupport
+        guard let info = try? CBOR.decode(response) else {
+            return AuthenticatorInfo(supportsHmacSecret: true, clientPinSet: false)
         }
+
+        // extensions (key 2): require hmac-secret if a list is present.
+        var supportsHmac = true
+        if case .array(let extensions)? = info.mapValue(forInt: 2) {
+            let names = extensions.compactMap { if case .text(let s) = $0 { return s } else { return nil } }
+            if !names.isEmpty { supportsHmac = names.contains("hmac-secret") }
+        }
+
+        // options (key 4): clientPin == true means a PIN is set.
+        var pinSet = false
+        if case .map(let opts)? = info.mapValue(forInt: 4) {
+            for (k, v) in opts {
+                if case .text("clientPin") = k, case .bool(let set) = v { pinSet = set }
+            }
+        }
+
+        return AuthenticatorInfo(supportsHmacSecret: supportsHmac, clientPinSet: pinSet)
     }
 
     // MARK: - makeCredential
 
-    private nonisolated static func makeCredential(_ device: FidoHidDevice) throws -> Enrollment {
+    private nonisolated static func makeCredential(_ device: FidoHidDevice, pinToken: Data?) throws -> Enrollment {
         var clientDataHashBytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, 32, &clientDataHashBytes)
 
@@ -100,7 +126,7 @@ nonisolated enum YubiKeyService {
         _ = SecRandomCopyBytes(kSecRandomDefault, 16, &userID)
 
         // CTAP2 makeCredential: integer-keyed map (canonical CBOR).
-        let request = CBOR.Value.map([
+        var pairs: [(CBOR.Value, CBOR.Value)] = [
             (.unsigned(1), .bytes(clientDataHashBytes)),                  // clientDataHash
             (.unsigned(2), .map([                                         // rp
                 (.text("id"), .text(rpID)),
@@ -120,16 +146,23 @@ nonisolated enum YubiKeyService {
             (.unsigned(7), .map([                                         // options: rk = true
                 (.text("rk"), .bool(true)),
             ])),
-        ])
+        ]
 
-        let body = CBOR.encode(request)
+        // PIN-protected: add pinUvAuthParam (0x08) + pinUvAuthProtocol (0x09).
+        if let pinToken {
+            let authParam = CtapPinProtocol.authenticate(token: pinToken, message: clientDataHashBytes)
+            pairs.append((.unsigned(8), .bytes(authParam)))
+            pairs.append((.unsigned(9), .unsigned(CtapPinProtocol.protocolVersion)))
+        }
+
+        let body = CBOR.encode(.map(pairs))
         let response: [UInt8]
         do {
             response = try device.sendCBOR(command: CtapCmd.makeCredential, body: body)
         } catch let FidoHidDevice.HidError.protocolError(message) {
-            // 0x36 = PIN required, 0x37 = PIN invalid, 0x6A = UV required
+            // 0x36 = PIN required, 0x35 = PIN not set, 0x6A = UV required
             if message.contains("0x36") || message.contains("0x6a") {
-                throw EnrollError.userVerificationRequired
+                throw EnrollError.needsPIN
             }
             throw EnrollError.failed(message)
         } catch {

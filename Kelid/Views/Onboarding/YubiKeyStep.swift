@@ -6,24 +6,34 @@ struct YubiKeyStep: View {
     @State private var isEnrolling = false
     @State private var enrolled = YubiKeyService.isEnrolled
     @State private var keyPresent = YubiKeyService.isKeyPresent
+    @State private var pin = ""
+    @State private var noPin = false
     @State private var errorMessage: String?
     @State private var presenceTimer: Timer?
+
+    /// Enroll is enabled only once the user has either entered a PIN or
+    /// explicitly declared the key has none.
+    private var canEnroll: Bool {
+        keyPresent && !isEnrolling && (noPin || !pin.isEmpty)
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "key.radiowaves.forward")
-                .font(.system(size: 40))
-                .foregroundStyle(enrolled ? AnyShapeStyle(.green) : AnyShapeStyle(LinearGradient.kelidAccent))
+                .font(.system(size: 38, weight: .medium))
+                .foregroundStyle(enrolled ? AnyShapeStyle(.green) : AnyShapeStyle(.tint))
 
-            Text("Add YubiKey")
-                .font(.title.bold())
-            Text("Unlock Kelid with a hardware security key over FIDO2.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                Text("Add YubiKey")
+                    .font(.kelid(28, .bold))
+                Text("Unlock Kelid with a hardware security key over FIDO2.")
+                    .font(.kelid(13, .regular))
+                    .foregroundStyle(.secondary)
+            }
 
             if enrolled {
                 Label("Security key enrolled", systemImage: "checkmark.circle.fill")
-                    .font(.headline)
+                    .font(.kelid(15, .semibold))
                     .foregroundStyle(.green)
                 Button("Remove enrollment", role: .destructive) {
                     YubiKeyService.removeEnrollment()
@@ -32,14 +42,25 @@ struct YubiKeyStep: View {
                 .buttonStyle(.glass)
                 .controlSize(.small)
             } else {
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(keyPresent ? .green : .secondary.opacity(0.4))
-                        .frame(width: 8, height: 8)
-                    Text(keyPresent ? "Security key detected" : "No security key detected")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                presenceRow
+
+                // PIN entry + "no PIN" escape hatch.
+                VStack(spacing: 10) {
+                    SecureField("Security key PIN", text: $pin)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.kelid(14, .regular))
+                        .disabled(noPin)
+                        .opacity(noPin ? 0.4 : 1)
+                        .frame(maxWidth: 280)
+
+                    Toggle(isOn: $noPin) {
+                        Text("My key has no PIN")
+                            .font(.kelid(12, .medium))
+                    }
+                    .toggleStyle(.checkbox)
+                    .onChange(of: noPin) { _, on in if on { pin = "" } }
                 }
+                .frame(maxWidth: 280)
 
                 Button {
                     enroll()
@@ -47,19 +68,22 @@ struct YubiKeyStep: View {
                     if isEnrolling {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Touch your key…")
+                            Text("Touch your key…").font(.kelid(14, .medium))
                         }
                     } else {
                         Label("Enroll YubiKey", systemImage: "key.radiowaves.forward")
+                            .font(.kelid(14, .semibold))
                     }
                 }
                 .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
                 .controlSize(.large)
-                .disabled(!keyPresent || isEnrolling)
+                .disabled(!canEnroll)
+                .opacity(canEnroll ? 1 : 0.5)
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.callout)
+                        .font(.kelid(12, .regular))
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 420)
@@ -67,7 +91,7 @@ struct YubiKeyStep: View {
             }
 
             Text("Creates a resident credential with the hmac-secret extension. A later milestone uses it to wrap your master keyslot; for now this proves the key works with Kelid.")
-                .font(.caption)
+                .font(.kelid(11, .regular))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 430)
@@ -75,15 +99,17 @@ struct YubiKeyStep: View {
             Spacer().frame(height: 4)
 
             HStack(spacing: 12) {
-                if !enrolled {
-                    Button("Skip for Now") { finish() }
-                        .buttonStyle(.glass)
-                        .controlSize(.large)
-                } else {
+                if enrolled {
                     Button("Finish Setup") { finish() }
                         .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
                         .controlSize(.large)
                         .keyboardShortcut(.defaultAction)
+                } else {
+                    Button("Skip for Now") { finish() }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.large)
                 }
             }
 
@@ -92,6 +118,17 @@ struct YubiKeyStep: View {
         .padding(.horizontal, 30)
         .onAppear { startPresencePolling() }
         .onDisappear { presenceTimer?.invalidate() }
+    }
+
+    private var presenceRow: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(keyPresent ? .green : .secondary.opacity(0.4))
+                .frame(width: 8, height: 8)
+            Text(keyPresent ? "Security key detected" : "No security key detected")
+                .font(.kelid(13, .regular))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func startPresencePolling() {
@@ -105,9 +142,10 @@ struct YubiKeyStep: View {
     private func enroll() {
         isEnrolling = true
         errorMessage = nil
+        let pinValue = noPin ? nil : pin
         Task {
             do {
-                _ = try await YubiKeyService.enroll()
+                _ = try await YubiKeyService.enroll(pin: pinValue)
                 enrolled = true
             } catch {
                 errorMessage = error.localizedDescription
