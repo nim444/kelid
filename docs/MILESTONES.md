@@ -15,6 +15,20 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.2 — splash redesign (2026-06-11)
+
+**What shipped.** Reworked `SplashStep` for a more modern feel: larger app icon
+(132pt) with a stronger accent glow; "Kelid" set in rounded 52pt bold with the
+Persian "کلید" inline beside it; a single clean subline **"Secret access layer
+for AI agents"**; removed the "Native successor of Svault…" line (kept that
+framing for the README/VISION, not the first-run UI). The Get Started button is
+now extra-large, capsule, glass-prominent with an arrow glyph and accent glow.
+Added a spring fade/scale-in on appear.
+
+**Wipe.** Not needed — pure UI.
+
+---
+
 ## Milestone 2.1 — app icon wired (2026-06-11)
 
 **What shipped.** The user's Icon Composer icon (`kelid.icon`) was moved into the

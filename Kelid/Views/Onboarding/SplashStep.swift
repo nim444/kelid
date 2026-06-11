@@ -4,39 +4,67 @@ import SwiftUI
 struct SplashStep: View {
     var onNext: () -> Void
 
+    @State private var appear = false
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             Spacer()
 
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 118, height: 118)
-                .shadow(color: Color.accentColor.opacity(0.35), radius: 18, y: 8)
-                .padding(.bottom, 6)
+                .frame(width: 132, height: 132)
+                .shadow(color: Color.accentColor.opacity(0.45), radius: 28, y: 10)
+                .scaleEffect(appear ? 1 : 0.86)
+                .opacity(appear ? 1 : 0)
 
-            Text("Kelid")
-                .font(.system(size: 40, weight: .bold))
-            Text("کلید")
-                .font(.title2)
-                .foregroundStyle(.tertiary)
-            Text("The key your AI agents have to ask for.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("Kelid")
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text("کلید")
+                        .font(.system(size: 30, weight: .regular))
+                        .foregroundStyle(.tertiary)
+                        .baselineOffset(2)
+                }
 
-            Text("Native successor of Svault — structured requests, policy, AI judge, audit.")
-                .font(.callout)
-                .foregroundStyle(.tertiary)
-                .padding(.top, 2)
+                Text("Secret access layer for AI agents")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 22)
+            .opacity(appear ? 1 : 0)
+            .offset(y: appear ? 0 : 10)
 
             Spacer()
 
-            Button("Get Started", action: onNext)
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
+            Button(action: onNext) {
+                HStack(spacing: 10) {
+                    Text("Get Started")
+                        .font(.title3.weight(.semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.body.weight(.semibold))
+                }
+                .padding(.horizontal, 30)
+                .padding(.vertical, 14)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.extraLarge)
+            .tint(.accentColor)
+            .keyboardShortcut(.defaultAction)
+            .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
+            .scaleEffect(appear ? 1 : 0.9)
+            .opacity(appear ? 1 : 0)
 
-            Spacer().frame(height: 20)
+            Spacer().frame(height: 44)
+        }
+        .padding(.horizontal, 40)
+        .onAppear {
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.7)) {
+                appear = true
+            }
         }
     }
 }
