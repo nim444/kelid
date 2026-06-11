@@ -84,6 +84,7 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 switch selection {
+                case .autoLock: AutoLockPane()
                 case .passphrase: ChangePassphrasePane()
                 case .recovery: RecoveryCodePane()
                 case .touchID: TouchIDPane()
@@ -100,12 +101,13 @@ struct SettingsView: View {
 // MARK: - Items
 
 enum SettingsItem: String, CaseIterable, Identifiable, Hashable {
-    case passphrase, recovery, touchID, yubiKey
+    case autoLock, passphrase, recovery, touchID, yubiKey
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .autoLock: "Auto Lock"
         case .passphrase: "Change Passphrase"
         case .recovery: "Recovery Code"
         case .touchID: "Touch ID"
@@ -115,6 +117,7 @@ enum SettingsItem: String, CaseIterable, Identifiable, Hashable {
 
     var icon: String {
         switch self {
+        case .autoLock: "timer"
         case .passphrase: "lock.rotation"
         case .recovery: "key.viewfinder"
         case .touchID: "touchid"
@@ -124,6 +127,7 @@ enum SettingsItem: String, CaseIterable, Identifiable, Hashable {
 
     private var keywords: [String] {
         switch self {
+        case .autoLock: ["lock", "idle", "timeout", "session", "auto", "security", "timer"]
         case .passphrase: ["password", "master", "change", "passphrase", "security"]
         case .recovery: ["recovery", "code", "backup", "reset", "reveal"]
         case .touchID: ["touch", "biometric", "fingerprint", "face"]

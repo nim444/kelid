@@ -15,6 +15,37 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.5 — auto lock + lock screen (2026-06-11)
+
+**Session locking.** Kelid now locks itself when idle and on every launch.
+
+- `AppStore` gains `isLocked`, `autoLockMinutes` (default **5**, options
+  1/5/15/30/60/Never), `preferredUnlock` (Touch ID / Passphrase), an
+  `NSEvent.addLocalMonitorForEvents` activity monitor plus a 5s idle check
+  timer, and `lockNow()` / `unlock()`. **Launches locked** whenever onboarding
+  is complete — a secrets app authenticates on every start.
+- `LockScreenView.swift` — full-window lock UI over the animated mesh: Kelid
+  glyph in glass, preferred method primary, the other as a fallback link.
+  Touch ID auto-prompts once per lock when preferred (cancel does not loop).
+  Passphrase verifies against the PBKDF2 record and clears from state after
+  each attempt. While locked, RootView renders **only** the lock screen — no
+  app content exists underneath.
+- `Settings > Auto Lock` (searchable: lock/idle/timeout/session/timer) —
+  interval picker, preferred-method radio group (Touch ID hidden until
+  enrolled), honest note that YubiKey unlock arrives with the crypto core,
+  and a Lock Now button.
+- Toolbar lock button (Cmd+L) next to the status chips.
+
+**Placeholders.** Unlock is still gate-based (verify/biometric check), not a
+keyslot decryption — that binding lands with the crypto core. YubiKey cannot
+truly unlock until hmac-secret wraps the master keyslot.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive defaults
+only. User test: launch → lock screen; unlock; idle 5 min → relocks; Cmd+L /
+Lock Now → instant lock; preferred method switch reorders the lock screen.
+
+---
+
 ## Milestone 3.4 — maximum-hardening pass (2026-06-11)
 
 User call: close every gap that can be closed natively before moving on. Wipe

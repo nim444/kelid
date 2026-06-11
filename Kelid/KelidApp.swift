@@ -24,10 +24,17 @@ struct RootView: View {
     @Environment(AppStore.self) private var store
 
     var body: some View {
-        if store.onboardingComplete {
-            MainWindowView()
-        } else {
-            OnboardingView()
+        Group {
+            if store.onboardingComplete {
+                if store.isLocked {
+                    LockScreenView()
+                } else {
+                    MainWindowView()
+                }
+            } else {
+                OnboardingView()
+            }
         }
+        .task { store.startAutoLock() }
     }
 }

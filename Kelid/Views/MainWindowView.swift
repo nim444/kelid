@@ -105,6 +105,19 @@ struct MainWindowView: View {
             if YubiKeyService.isEnrolled {
                 chip("YubiKey", "key.radiowaves.forward")
             }
+            Button {
+                store.lockNow()
+            } label: {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular, in: .capsule)
+            .keyboardShortcut("l", modifiers: .command)
+            .help("Lock now (Cmd+L)")
         }
     }
 
