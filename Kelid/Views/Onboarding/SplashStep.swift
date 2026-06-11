@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SplashStep: View {
@@ -7,11 +8,10 @@ struct SplashStep: View {
         VStack(spacing: 14) {
             Spacer()
 
-            Image(systemName: "key.fill")
-                .font(.system(size: 52, weight: .medium))
-                .foregroundStyle(.white)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .scaledToFit()
                 .frame(width: 118, height: 118)
-                .glassEffect(.regular.tint(Color.accentColor.opacity(0.55)).interactive(), in: .circle)
                 .shadow(color: Color.accentColor.opacity(0.35), radius: 18, y: 8)
                 .padding(.bottom, 6)
 

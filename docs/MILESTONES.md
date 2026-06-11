@@ -15,6 +15,22 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 2.1 — app icon wired (2026-06-11)
+
+**What shipped.** The user's Icon Composer icon (`kelid.icon`) was moved into the
+target group as `Kelid/AppIcon.icon` (blue auto-gradient, white password/key
+glyph, neutral shadow, translucency). The placeholder `AppIcon.appiconset` was
+removed to avoid a name clash; `ASSETCATALOG_COMPILER_APPICON_NAME` stays
+`AppIcon`, so actool compiles it to `AppIcon.icns` + `Assets.car` automatically.
+The splash screen now shows the real app icon (`NSApp.applicationIconImage`)
+instead of the SF Symbol key.
+
+**Verified.** CLI build clean; `AppIcon.icns` present in the built app bundle.
+Dock icon staleness, if any, is a LaunchServices cache issue — relaunch or
+`killall Dock`.
+
+---
+
 ## Milestone 2 — real YubiKey enrollment (2026-06-11)
 
 **Goal.** Replace the YubiKey placeholder with working hardware enrollment the
