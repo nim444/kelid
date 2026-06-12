@@ -26,7 +26,8 @@ Reset onboarding for testing:
   is complete — a secrets app authenticates on every start.
 - `LockScreenView.swift` — full-window lock UI over the animated mesh: Kelid
   glyph in glass, preferred method primary, the other as a fallback link.
-  Touch ID auto-prompts once per lock when preferred (cancel does not loop).
+  Touch ID never auto-prompts (user feedback: the popup on appear was
+  annoying) — the sensor sheet only opens after clicking the unlock button.
   Passphrase verifies against the PBKDF2 record and clears from state after
   each attempt. While locked, RootView renders **only** the lock screen — no
   app content exists underneath.

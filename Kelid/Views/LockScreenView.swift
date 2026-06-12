@@ -10,7 +10,6 @@ struct LockScreenView: View {
     @State private var checking = false
     @State private var errorMessage: String?
     @State private var usePassphrase = false
-    @State private var autoPrompted = false
 
     private var touchAvailable: Bool {
         store.touchIDEnrolled && TouchIDService.isAvailable
@@ -62,7 +61,6 @@ struct LockScreenView: View {
         }
         .frame(minWidth: 680, maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
         .background(WindowConfigurator(hideSystemButtons: false))
-        .task { await autoPromptIfPreferred() }
     }
 
     // MARK: - Touch ID first
@@ -141,14 +139,6 @@ struct LockScreenView: View {
     }
 
     // MARK: - Actions
-
-    /// If Touch ID is the preferred method, offer the sensor immediately —
-    /// once per lock, so a cancel doesn't loop the prompt.
-    private func autoPromptIfPreferred() async {
-        guard touchLeads, !autoPrompted else { return }
-        autoPrompted = true
-        await unlockWithTouchID()
-    }
 
     private func unlockWithTouchID() async {
         checking = true
