@@ -15,6 +15,57 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.9 — Guardian is judges-only + Vaults section with wizard (2026-06-12)
+
+User correction on 3.8: the Guardian section had grown secret rules and seals
+— wrong home. Guardian now mirrors Svault's Guardian screen exactly (judges
+only); vaults are where policy lives, created via **Svault's 4-step vault
+wizard** (ported from `gui/src/screens/VaultConfig.tsx`).
+
+**Guardian (restructured).**
+- `GuardianView` — global switch, guardian list (default badge / edit /
+  delete), creation wizard, and the test console. Nothing else.
+- `GuardianTestConsole` — now a pure `svault judge test`: free fields
+  (guardian, caller, secret name, scope, tier, purpose, reason) sent straight
+  to the model via JudgeClient; verdict card shows the threshold math; no
+  policy state is touched. Audited as "Guardian test".
+- `GuardianStore` slimmed to guardian CRUD + default + global flag.
+  `PolicyEngine.swift` and the `SecretRule`/`Seal` models stay as the dormant
+  enforcement engine — they attach to vault secrets when the crypto core
+  ships (rate limits remain per-secret by design).
+
+**Vaults (new primary section).**
+- `Models/Vault.swift` + `Services/VaultsStore.swift` — vault registry
+  (metadata + policy settings, UserDefaults; the encrypted store binds to
+  these entries when the crypto core lands). Name uniqueness enforced.
+- `Views/Vaults/VaultWizard.swift` — Svault's exact 4 steps:
+  1. **Basics** — name (vault id, locked on edit) + description ("the
+     guardian reads it with every request").
+  2. **Agent access** — who may ask (No agents / Named only / Any agent, with
+     Svault's help texts + callers field) and the structured rate-limit input
+     (count + minute/hour/day). Kelid difference: labeled **"Default rate
+     limit per secret"** — enforcement is per secret, never per vault.
+  3. **Protection** — tier radio cards with Svault's descriptions (plus the
+     "human-only while no guardian is active" warning) and the guardian
+     choice: "Guardian reviews requests (recommended)" with an assigned-
+     guardian picker (default-guardian fallback) vs "Policies only"; honest
+     warning block when no guardian exists.
+  4. **Locking** — auto-lock toggle + 30m/12h/1d timer, unlock method
+     (Passphrase / YubiKey with not-enrolled hint).
+- `Views/Vaults/VaultsView.swift` — vault cards with tier / guardian /
+  agent-mode / per-secret-rate chips, edit (same wizard prefilled, name
+  locked) and delete. Dashboard "Vaults" stat is now live.
+- Sidebar: Dashboard, Vaults, Guardian, Audit. Vault create/update/delete
+  audited.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive
+(orphaned `guardian_rules`/`guardian-state.json` from 3.8 are ignored
+harmlessly). User test: Guardian shows judges only; create a vault through
+the 4 steps and assign the guardian; card chips reflect choices; edit reopens
+prefilled with the name locked; audit logs the lifecycle.
+
+---
+
 ## Milestone 3.8 — Guardian: AI judge + secret-level policy engine (2026-06-12)
 
 The Guardian (Svault 2.0's name for the AI judge) arrives as a working,

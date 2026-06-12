@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// Guardian pane: the AI judges that gate secret access, the per-secret
-/// policy rules (rate limit lives on the secret — Kelid's change vs Svault),
-/// sealed secrets awaiting human approval, and the live test console.
+/// Guardian pane — guardians (AI judges) only, like Svault's Guardian screen:
+/// the global switch, the guardian list with its creation wizard, and a test
+/// console. Vaults assign a guardian; per-secret policy ships with the vault
+/// engine.
 struct GuardianView: View {
     @Environment(GuardianStore.self) private var store
     @Environment(ProvidersStore.self) private var providers
 
     @State private var wizardGuardian: Guardian?
     @State private var showWizard = false
-    @State private var ruleEditor: SecretRule?
-    @State private var showRuleEditor = false
     @State private var toast: Toast?
 
     var body: some View {
@@ -18,10 +17,6 @@ struct GuardianView: View {
             VStack(alignment: .leading, spacing: 16) {
                 statusCard
                 guardiansCard
-                rulesCard
-                if !store.seals.isEmpty {
-                    sealsCard
-                }
                 GuardianTestConsole(toast: $toast)
             }
             .padding(24)
@@ -29,9 +24,6 @@ struct GuardianView: View {
         .toast($toast)
         .sheet(isPresented: $showWizard) {
             GuardianWizard(existing: wizardGuardian)
-        }
-        .sheet(isPresented: $showRuleEditor) {
-            RuleEditorSheet(existing: ruleEditor)
         }
     }
 
@@ -75,7 +67,7 @@ struct GuardianView: View {
         if !operational {
             return "The guardian's provider has no credential — configure it in Providers."
         }
-        return "Scores every request 0\u{2013}100 on whether the stated reason justifies access."
+        return "Scores every request 0\u{2013}100 on whether the stated reason justifies access. Vaults pick which guardian reviews them."
     }
 
     // MARK: - Guardians
@@ -158,149 +150,5 @@ struct GuardianView: View {
             .controlSize(.small)
         }
         .padding(.vertical, 2)
-    }
-
-    // MARK: - Rules
-
-    private var rulesCard: some View {
-        PaneCard {
-            HStack {
-                Text("Secret Rules")
-                    .font(.kelid(13, .semibold))
-                Spacer()
-                Button {
-                    ruleEditor = nil
-                    showRuleEditor = true
-                } label: {
-                    Label("Add Rule", systemImage: "plus")
-                        .font(.kelid(12, .semibold))
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-            }
-
-            Text("Rate limits and brute-force protection are per secret — repeated denials seal the secret itself, and rotating callers doesn't help.")
-                .font(.kelid(11, .regular))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if store.rules.isEmpty {
-                PaneStatus(kind: .info, message: "No rules yet. Add one to exercise the pipeline in the test console; real secrets attach to these rules when the vault engine ships.")
-            } else {
-                ForEach(store.rules) { rule in
-                    ruleRow(rule)
-                }
-            }
-        }
-    }
-
-    private func ruleRow(_ rule: SecretRule) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: store.seals[rule.name] != nil ? "lock.fill" : "key.horizontal")
-                .font(.system(size: 13))
-                .foregroundStyle(store.seals[rule.name] != nil ? AnyShapeStyle(.red) : AnyShapeStyle(LinearGradient.kelidAccent))
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(rule.name).font(.kelid(13, .semibold))
-                    tierChip(rule.tier)
-                    if store.seals[rule.name] != nil {
-                        Text("SEALED")
-                            .font(.kelid(9, .bold))
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.red.opacity(0.12), in: .capsule)
-                    }
-                }
-                Text("\(rule.scope) \u{2022} \(rule.rateLimit)\(rule.requireReason ? " \u{2022} reason required" : "")")
-                    .font(.kelid(11, .regular))
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer()
-            Button {
-                ruleEditor = rule
-                showRuleEditor = true
-            } label: {
-                Image(systemName: "pencil").font(.system(size: 11))
-            }
-            .buttonStyle(.glass)
-            .controlSize(.small)
-            Button(role: .destructive) {
-                store.removeRule(rule)
-                toast = .info("Rule \(rule.name) removed")
-            } label: {
-                Image(systemName: "trash").font(.system(size: 11))
-            }
-            .buttonStyle(.glass)
-            .controlSize(.small)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private func tierChip(_ tier: Tier) -> some View {
-        let color: Color = switch tier {
-        case .low: .green
-        case .medium: .orange
-        case .high: .red
-        }
-        return Text(tier.rawValue)
-            .font(.kelid(10, .semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.12), in: .capsule)
-    }
-
-    // MARK: - Seals
-
-    private var sealsCard: some View {
-        PaneCard {
-            Text("Sealed Secrets")
-                .font(.kelid(13, .semibold))
-            Text("Brute-force response: these secrets deny every request until a human clears them. Unsealing requires Touch ID or your Mac password.")
-                .font(.kelid(11, .regular))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            ForEach(store.seals.sorted(by: { $0.key < $1.key }), id: \.key) { name, seal in
-                HStack(spacing: 12) {
-                    Image(systemName: "lock.trianglebadge.exclamationmark.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.red)
-                        .frame(width: 22)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(name).font(.kelid(13, .semibold))
-                        Text("\(seal.trigger) \u{2022} last caller \(seal.lastCaller) \u{2022} \(seal.sealedAt.formatted(.relative(presentation: .named)))")
-                            .font(.kelid(11, .regular))
-                            .foregroundStyle(.tertiary)
-                    }
-                    Spacer()
-                    Button {
-                        unseal(name)
-                    } label: {
-                        Text("Unseal").font(.kelid(12, .semibold))
-                    }
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
-                }
-                .padding(.vertical, 2)
-            }
-        }
-    }
-
-    private func unseal(_ name: String) {
-        Task {
-            let ok = await TouchIDService.requireUserPresence(reason: "unseal the secret \(name)")
-            if ok {
-                store.unseal(name)
-                toast = .success("\(name) unsealed")
-            } else {
-                AuditLog.shared.record(.guardian, "Unseal denied", detail: name, outcome: .denied)
-                toast = .error("Authentication required to unseal")
-            }
-        }
     }
 }

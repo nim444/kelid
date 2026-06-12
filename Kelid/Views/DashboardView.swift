@@ -3,6 +3,8 @@ import SwiftUI
 /// Dashboard detail pane — stat cards and empty states. The window chrome and
 /// sidebar are provided by MainWindowView.
 struct DashboardPane: View {
+    @Environment(VaultsStore.self) private var vaults
+
     private let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16),
@@ -15,8 +17,8 @@ struct DashboardPane: View {
                     statCard(
                         icon: "shippingbox",
                         title: "Vaults",
-                        value: "0",
-                        hint: "Create your first vault — next milestone"
+                        value: "\(vaults.vaults.count)",
+                        hint: vaults.vaults.isEmpty ? "Create your first vault" : "Encrypted store arrives with the crypto core"
                     )
                     statCard(
                         icon: "key.horizontal",

@@ -6,6 +6,7 @@ struct KelidApp: App {
     @State private var providers = ProvidersStore()
     @State private var telegram = TelegramStore()
     @State private var guardian = GuardianStore()
+    @State private var vaults = VaultsStore()
 
     init() {
         KelidFont.registerIfNeeded()
@@ -18,6 +19,7 @@ struct KelidApp: App {
                 .environment(providers)
                 .environment(telegram)
                 .environment(guardian)
+                .environment(vaults)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
