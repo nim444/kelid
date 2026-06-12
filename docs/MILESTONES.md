@@ -15,6 +15,57 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 4.1 — MCP agent gateway (2026-06-12)
+
+Agents can now actually ask. The dormant PolicyEngine goes live: Kelid runs a
+local MCP server and every request is gated end to end.
+
+**Transport.** Streamable HTTP inside the app (NWListener, loopback only,
+default port 4141, configurable). The app is the daemon for now — it must be
+running. `ENABLE_INCOMING_NETWORK_CONNECTIONS` added (sandbox). Minimal
+HTTP/1.1 + JSON-RPC 2.0 (`initialize`, `tools/list`, `tools/call`, `ping`;
+notifications → 202; GET → 405, stateless DELETE → 200). Protocol 2024-11-05.
+Connect: `claude mcp add --transport http kelid http://127.0.0.1:4141/mcp`.
+
+**Tools** (Svault's, with the user's change: **`vault` is required**):
+- `kelid_list_vaults` → `[{name, unlocked, description}]`
+- `kelid_get_secret(vault, name, scope, reason, caller?)`
+
+**Security model (Svault semantics, verified against src/mcp/mod.rs).**
+- Serves only unlocked state; locked Kelid → "a human must unlock"; an agent
+  can never unlock.
+- Human enable switch checked before any policy work; off → generic "request
+  not available" (indistinguishable from a denial). Default OFF — no silent
+  security defaults.
+- Denials to the agent are always `GateService.genericDeny`; the real reason
+  (scope mismatch, rate limit, guardian score, seal, window…) goes only to
+  the audit log, stamped `[mcp]`.
+- `initialize` instructions describe how to ask, never the decision criteria.
+
+**GateService — the enforced path.** Pipeline per request: app unlocked →
+vault exists → vault agentMode (none = human-only; list = caller allowlist)
+→ secret exists → stated scope must match → time windows (mon-fri
+HH:MM-HH:MM parser, start-inclusive end-exclusive) → PolicyEngine (seal →
+reason ≥10 → required callers → per-secret rate limit → bursts → tier) →
+guardian via the vault's assigned guardian (medium fails open flagged, high
+fails closed). Auto-seal at 5 denials/300s; **a Telegram alert fires to all
+whitelisted chats when a secret seals**. Activity window persisted in
+gate-state.json (0600). Agent grants stamp lastReadAt.
+
+**Agents section unhidden.** Gateway card (enable switch, running status,
+port + apply), connect snippet with copy, callers-seen chips, recent agent
+request feed. Dashboard Agents stat = distinct callers; new `.agent` audit
+category.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed.** User test: Agents
+→ enable gateway → run the claude mcp add snippet → in Claude Code ask for
+DATABASE_URL (vault development-local, scope database) with a real reason →
+value returned, request in the feed + audit. Vague reason → generic denial.
+5 bad requests → secret seals + Telegram alert. Lock Kelid (Cmd+L) → agent
+gets "a human must unlock".
+
+---
+
 ## Milestone 4.0 — secrets inside vaults (2026-06-12)
 
 Vaults now hold secrets — Svault's Secrets screen ported, with Kelid's

@@ -114,6 +114,17 @@ final class SecretsStore {
         persistSeals()
     }
 
+    /// Brute-force response from the gate: repeated denials sealed the secret.
+    func autoSeal(_ secret: VaultSecret, in vaultID: UUID, lastCaller: String) {
+        seals[sealKey(vaultID, secret.name)] = Seal(
+            sealedAt: .now,
+            trigger: "\(PolicyEngine.sealDenyThreshold) denials in \(Int(PolicyEngine.sealWindowSecs))s",
+            lastCaller: lastCaller,
+            denials: PolicyEngine.sealDenyThreshold
+        )
+        persistSeals()
+    }
+
     /// Human-only; caller must have passed a fresh user-presence check.
     func unseal(_ secret: VaultSecret, in vaultID: UUID) {
         seals.removeValue(forKey: sealKey(vaultID, secret.name))

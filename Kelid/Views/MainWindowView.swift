@@ -66,6 +66,7 @@ struct MainWindowView: View {
                     case .dashboard: DashboardPane()
                     case .vaults: VaultsView()
                     case .guardian: GuardianView()
+                    case .agents: AgentsView()
                     case .audit: AuditView()
                     case .providers: ProvidersView()
                     case .settings: SettingsView()
@@ -140,12 +141,11 @@ struct MainWindowView: View {
 // MARK: - Sections
 
 enum MainSection: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, vaults, guardian, audit, providers, settings
+    case dashboard, vaults, guardian, agents, audit, providers, settings
 
     var id: String { rawValue }
 
-    // Agents stays hidden until the MCP gateway ships.
-    static let primary: [MainSection] = [.dashboard, .vaults, .guardian, .audit]
+    static let primary: [MainSection] = [.dashboard, .vaults, .guardian, .agents, .audit]
     static let system: [MainSection] = [.providers, .settings]
 
     var title: String {
@@ -153,6 +153,7 @@ enum MainSection: String, CaseIterable, Identifiable, Hashable {
         case .dashboard: "Dashboard"
         case .vaults: "Vaults"
         case .guardian: "Guardian"
+        case .agents: "Agents"
         case .audit: "Audit"
         case .providers: "Providers"
         case .settings: "Settings"
@@ -164,6 +165,7 @@ enum MainSection: String, CaseIterable, Identifiable, Hashable {
         case .dashboard: "square.grid.2x2"
         case .vaults: "shippingbox"
         case .guardian: "checkmark.shield"
+        case .agents: "antenna.radiowaves.left.and.right"
         case .audit: "list.bullet.rectangle"
         case .providers: "cpu"
         case .settings: "gearshape"

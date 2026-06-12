@@ -8,6 +8,7 @@ struct KelidApp: App {
     @State private var guardian = GuardianStore()
     @State private var vaults = VaultsStore()
     @State private var secrets = SecretsStore()
+    @State private var mcp = McpStore()
 
     init() {
         KelidFont.registerIfNeeded()
@@ -22,6 +23,13 @@ struct KelidApp: App {
                 .environment(guardian)
                 .environment(vaults)
                 .environment(secrets)
+                .environment(mcp)
+                .task {
+                    mcp.configure(gate: GateService(
+                        app: store, vaults: vaults, secrets: secrets,
+                        guardians: guardian, providers: providers, telegram: telegram
+                    ))
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)

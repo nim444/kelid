@@ -5,6 +5,7 @@ import SwiftUI
 struct DashboardPane: View {
     @Environment(VaultsStore.self) private var vaults
     @Environment(SecretsStore.self) private var secrets
+    @Environment(McpStore.self) private var mcp
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -28,10 +29,10 @@ struct DashboardPane: View {
                         hint: secrets.totalCount == 0 ? "Secrets live inside vaults" : "Keychain-held until the crypto core"
                     )
                     statCard(
-                        icon: "cpu",
+                        icon: "antenna.radiowaves.left.and.right",
                         title: "Agents",
-                        value: "0",
-                        hint: "Agents connect over MCP"
+                        value: "\(mcp.knownCallers.count)",
+                        hint: mcp.running ? "Gateway live at 127.0.0.1:\(mcp.port)" : "Enable the MCP gateway in Agents"
                     )
                     statCard(
                         icon: "list.bullet.rectangle",

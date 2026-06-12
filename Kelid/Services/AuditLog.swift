@@ -8,7 +8,7 @@ import Observation
 /// Details never contain secret values — names and outcomes only.
 struct AuditEvent: Codable, Identifiable, Hashable {
     enum Category: String, Codable, CaseIterable, Identifiable {
-        case session, master, touchID, yubiKey, provider, telegram, guardian, secret, system
+        case session, master, touchID, yubiKey, provider, telegram, guardian, secret, agent, system
 
         var id: String { rawValue }
 
@@ -22,6 +22,7 @@ struct AuditEvent: Codable, Identifiable, Hashable {
             case .telegram: "Telegram"
             case .guardian: "Guardian"
             case .secret: "Secrets"
+            case .agent: "Agents"
             case .system: "System"
             }
         }
@@ -36,6 +37,7 @@ struct AuditEvent: Codable, Identifiable, Hashable {
             case .telegram: "paperplane"
             case .guardian: "checkmark.shield"
             case .secret: "key.horizontal.fill"
+            case .agent: "antenna.radiowaves.left.and.right"
             case .system: "gearshape"
             }
         }
