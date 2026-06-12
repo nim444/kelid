@@ -38,6 +38,7 @@ struct YubiKeyStep: View {
                 Button("Remove enrollment", role: .destructive) {
                     YubiKeyService.removeEnrollment()
                     enrolled = false
+                    AuditLog.shared.record(.yubiKey, "YubiKey enrollment removed", outcome: .info)
                 }
                 .buttonStyle(.glass)
                 .controlSize(.small)
@@ -148,7 +149,9 @@ struct YubiKeyStep: View {
                 _ = try await YubiKeyService.enroll(pin: pinValue)
                 enrolled = true
                 pin = "" // drop the PIN from memory once it has served its purpose
+                AuditLog.shared.record(.yubiKey, "YubiKey enrolled")
             } catch {
+                AuditLog.shared.record(.yubiKey, "YubiKey enrollment failed", detail: error.localizedDescription, outcome: .failure)
                 errorMessage = error.localizedDescription
             }
             isEnrolling = false
@@ -158,5 +161,6 @@ struct YubiKeyStep: View {
     private func finish() {
         presenceTimer?.invalidate()
         store.onboardingComplete = true
+        AuditLog.shared.record(.system, "Onboarding completed")
     }
 }

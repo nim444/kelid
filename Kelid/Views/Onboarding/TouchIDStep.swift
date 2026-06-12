@@ -82,7 +82,9 @@ struct TouchIDStep: View {
             let ok = await TouchIDService.authenticate(reason: "enable Touch ID unlock for Kelid")
             if ok {
                 store.touchIDEnrolled = true
+                AuditLog.shared.record(.touchID, "Touch ID enabled")
             } else {
+                AuditLog.shared.record(.touchID, "Touch ID enrollment failed", outcome: .failure)
                 failed = true
             }
         }

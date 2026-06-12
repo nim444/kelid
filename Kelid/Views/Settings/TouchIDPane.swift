@@ -22,6 +22,7 @@ struct TouchIDPane: View {
                     PaneStatus(kind: .success, message: "Touch ID is enabled for this vault.")
                     Button("Remove Touch ID", role: .destructive) {
                         store.touchIDEnrolled = false
+                        AuditLog.shared.record(.touchID, "Touch ID removed", outcome: .info)
                         status = (.info, "Touch ID removed.")
                     }
                     .buttonStyle(.glass)
@@ -59,8 +60,10 @@ struct TouchIDPane: View {
             let ok = await TouchIDService.authenticate(reason: "Enable Touch ID for Kelid")
             if ok {
                 store.touchIDEnrolled = true
+                AuditLog.shared.record(.touchID, "Touch ID enabled")
                 status = (.success, "Touch ID enabled.")
             } else {
+                AuditLog.shared.record(.touchID, "Touch ID enrollment failed", outcome: .failure)
                 status = (.error, "Touch ID was not confirmed.")
             }
             busy = false

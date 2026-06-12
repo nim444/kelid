@@ -72,8 +72,10 @@ struct ChangePassphrasePane: View {
             do {
                 try await MasterKeyStore.changePassphrase(current: current, new: newPass)
                 current = ""; newPass = ""; confirm = ""
+                AuditLog.shared.record(.master, "Passphrase changed")
                 status = (.success, "Passphrase updated.")
             } catch {
+                AuditLog.shared.record(.master, "Passphrase change failed", detail: error.localizedDescription, outcome: .failure)
                 status = (.error, error.localizedDescription)
             }
             busy = false

@@ -112,7 +112,9 @@ struct RecoveryCodePane: View {
                 let code = try await MasterKeyStore.regenerateRecoveryCode(currentPassphrase: passphrase)
                 passphrase = "" // drop from memory as soon as it has been used
                 newCode = code
+                AuditLog.shared.record(.master, "Recovery code regenerated")
             } catch {
+                AuditLog.shared.record(.master, "Recovery code regeneration failed", detail: error.localizedDescription, outcome: .failure)
                 status = (.error, error.localizedDescription)
             }
             busy = false

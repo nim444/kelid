@@ -90,6 +90,7 @@ struct TelegramPane: View {
                     store.setToken(trimmedToken)
                     tokenField = ""
                     revealToken = false
+                    AuditLog.shared.record(.telegram, "Bot token saved")
                     toast = .success("Bot token saved")
                 } label: {
                     Text(store.hasToken ? "Update Token" : "Save Token").font(.kelid(13, .semibold))
@@ -112,6 +113,7 @@ struct TelegramPane: View {
                     Button(role: .destructive) {
                         store.removeToken()
                         tokenField = ""
+                        AuditLog.shared.record(.telegram, "Bot token removed", outcome: .info)
                         toast = .info("Bot token removed")
                     } label: {
                         Text("Remove").font(.kelid(13, .semibold))
@@ -236,6 +238,7 @@ struct TelegramPane: View {
 
             Button(role: .destructive) {
                 store.remove(chat)
+                AuditLog.shared.record(.telegram, "Chat removed from whitelist", detail: "\(chat.title) (\(chat.id))", outcome: .info)
                 toast = .info("\(chat.title) removed from whitelist")
             } label: {
                 Image(systemName: "trash")
@@ -261,6 +264,7 @@ struct TelegramPane: View {
             Spacer()
             Button {
                 store.approve(chat)
+                AuditLog.shared.record(.telegram, "Chat whitelisted", detail: "\(chat.title) (\(chat.id))")
                 toast = .success("\(chat.title) whitelisted")
             } label: {
                 Text("Approve").font(.kelid(12, .semibold))
@@ -286,7 +290,9 @@ struct TelegramPane: View {
                 if ok {
                     tokenField = store.token ?? ""
                     revealToken = true
+                    AuditLog.shared.record(.telegram, "Bot token revealed", outcome: .info)
                 } else {
+                    AuditLog.shared.record(.telegram, "Bot token reveal denied", outcome: .denied)
                     toast = .error("Authentication required to reveal the token")
                 }
             }
@@ -306,8 +312,10 @@ struct TelegramPane: View {
         Task {
             do {
                 let bot = try await TelegramService.getMe(token: token)
+                AuditLog.shared.record(.telegram, "Bot verified", detail: "@\(bot.username)")
                 toast = .success("Connected as @\(bot.username)")
             } catch {
+                AuditLog.shared.record(.telegram, "Bot verification failed", detail: error.localizedDescription, outcome: .failure)
                 toast = .error(error.localizedDescription)
             }
             testing = false
@@ -333,6 +341,7 @@ struct TelegramPane: View {
     private func addManual() {
         guard let id = Int64(manualID.trimmingCharacters(in: .whitespaces)) else { return }
         store.addManual(id: id, label: manualLabel)
+        AuditLog.shared.record(.telegram, "Chat whitelisted", detail: "manual entry (\(id))")
         manualID = ""
         manualLabel = ""
         toast = .success("Chat whitelisted")
@@ -349,8 +358,10 @@ struct TelegramPane: View {
                     to: chat.id,
                     whitelist: store.whitelist
                 )
+                AuditLog.shared.record(.telegram, "Test message sent", detail: chat.title)
                 toast = .success("Test message sent to \(chat.title)")
             } catch {
+                AuditLog.shared.record(.telegram, "Message send failed", detail: "\(chat.title): \(error.localizedDescription)", outcome: .failure)
                 toast = .error(error.localizedDescription)
             }
             sendingTo = nil

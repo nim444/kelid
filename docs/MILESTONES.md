@@ -15,6 +15,42 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.7 — tamper-evident audit log + Audit section (2026-06-12)
+
+"Everything is audited" becomes real: an append-only, hash-chained audit log
+and a charts-backed Audit section in the sidebar.
+
+- `Services/AuditLog.swift` — `AuditEvent` (category, action, detail, outcome)
+  in a **tamper-evident hash chain**: each entry's SHA-256 covers the previous
+  entry's hash, so editing or deleting any line in `audit.jsonl` breaks
+  verification for everything after it. JSONL on disk (0600, sandbox
+  container), chain verified on every load, `chainValid` surfaced in the UI.
+  **Details never contain secret values** — names and outcomes only.
+  Recording never throws into the caller: auditing must not crash the app.
+- `Views/Audit/AuditView.swift` — stat cards (Total / Today / Failures+Denied /
+  **Hash Chain Verified-or-BROKEN**), a 14-day **daily activity bar chart**
+  (native Swift Charts, brand gradient), category filter menu + search, and
+  the event stream with outcome chips (ok / failed / denied / info) and
+  relative timestamps.
+- Audit unhidden in the sidebar (Dashboard + Audit primary). The Dashboard
+  "Audit Events" card now shows the live count.
+
+**Instrumented (init audit logic — everything built so far).**
+Session: unlock via Touch ID / passphrase, failed unlocks, manual lock,
+auto-lock (with idle minutes). Master: passphrase created / changed / change
+failed, recovery code regenerated / failed. Touch ID: enabled / failed /
+removed. YubiKey: enrolled / enrollment failed / removed. AI providers: key
+saved / removed / revealed / **reveal denied** / test passed / test failed /
+endpoint saved. Telegram: token saved / removed / revealed / reveal denied,
+bot verified / failed, chat whitelisted (discovery + manual) / removed, test
+message sent / failed. System: onboarding completed.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive. User
+test: use the app a bit, open Audit, watch events stream in, filter and
+search, check the chart populates today's bar, confirm "Hash Chain Verified".
+
+---
+
 ## Milestone 3.6 — Telegram alert channel with whitelist (2026-06-12)
 
 First Communications provider: a Telegram bot for audit alerts and (later)

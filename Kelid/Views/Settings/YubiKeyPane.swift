@@ -32,6 +32,7 @@ struct YubiKeyPane: View {
                     Button("Remove YubiKey", role: .destructive) {
                         YubiKeyService.removeEnrollment()
                         enrolled = false
+                        AuditLog.shared.record(.yubiKey, "YubiKey enrollment removed", outcome: .info)
                         status = (.info, "YubiKey enrollment removed.")
                     }
                     .buttonStyle(.glass)
@@ -110,8 +111,10 @@ struct YubiKeyPane: View {
                 _ = try await YubiKeyService.enroll(pin: pinValue)
                 enrolled = true
                 pin = "" // drop the PIN from memory once it has served its purpose
+                AuditLog.shared.record(.yubiKey, "YubiKey enrolled")
                 status = (.success, "Security key enrolled.")
             } catch {
+                AuditLog.shared.record(.yubiKey, "YubiKey enrollment failed", detail: error.localizedDescription, outcome: .failure)
                 status = (.error, error.localizedDescription)
             }
             isEnrolling = false

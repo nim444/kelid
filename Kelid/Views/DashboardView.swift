@@ -33,8 +33,8 @@ struct DashboardPane: View {
                     statCard(
                         icon: "list.bullet.rectangle",
                         title: "Audit Events",
-                        value: "0",
-                        hint: "Every request is recorded"
+                        value: "\(AuditLog.shared.events.count)",
+                        hint: "Every action is recorded"
                     )
                 }
 

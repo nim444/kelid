@@ -64,6 +64,7 @@ struct MainWindowView: View {
                 Group {
                     switch selection {
                     case .dashboard: DashboardPane()
+                    case .audit: AuditView()
                     case .providers: ProvidersView()
                     case .settings: SettingsView()
                     }
@@ -137,17 +138,18 @@ struct MainWindowView: View {
 // MARK: - Sections
 
 enum MainSection: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, providers, settings
+    case dashboard, audit, providers, settings
 
     var id: String { rawValue }
 
-    // Vaults / Agents / Audit are hidden until their onboarding ships.
-    static let primary: [MainSection] = [.dashboard]
+    // Vaults / Agents stay hidden until their engines ship.
+    static let primary: [MainSection] = [.dashboard, .audit]
     static let system: [MainSection] = [.providers, .settings]
 
     var title: String {
         switch self {
         case .dashboard: "Dashboard"
+        case .audit: "Audit"
         case .providers: "Providers"
         case .settings: "Settings"
         }
@@ -156,6 +158,7 @@ enum MainSection: String, CaseIterable, Identifiable, Hashable {
     var icon: String {
         switch self {
         case .dashboard: "square.grid.2x2"
+        case .audit: "list.bullet.rectangle"
         case .providers: "cpu"
         case .settings: "gearshape"
         }

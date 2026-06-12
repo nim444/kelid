@@ -110,6 +110,7 @@ struct PassphraseStep: View {
         Task {
             do {
                 let code = try await MasterKeyStore.create(passphrase: passphrase)
+                AuditLog.shared.record(.master, "Master passphrase created")
                 isWorking = false
                 onCreated(code)
             } catch {

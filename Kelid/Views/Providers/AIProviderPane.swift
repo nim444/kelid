@@ -210,7 +210,9 @@ struct AIProviderPane: View {
                 if ok {
                     key = store.apiKey(for: provider) ?? ""
                     revealKey = true
+                    AuditLog.shared.record(.provider, "\(provider.name) key revealed", outcome: .info)
                 } else {
+                    AuditLog.shared.record(.provider, "\(provider.name) key reveal denied", outcome: .denied)
                     toast = .error("Authentication required to reveal the key")
                 }
             }
@@ -225,9 +227,11 @@ struct AIProviderPane: View {
             store.setAPIKey(trimmedKey, for: provider)
             key = ""
             revealKey = false
+            AuditLog.shared.record(.provider, "\(provider.name) key saved")
             toast = .success("\(provider.name) key saved")
         case .localEndpoint:
             store.setBaseURL(baseURL.trimmingCharacters(in: .whitespaces), for: provider)
+            AuditLog.shared.record(.provider, "\(provider.name) endpoint saved")
             toast = .success("Endpoint saved")
         }
     }
@@ -235,6 +239,7 @@ struct AIProviderPane: View {
     private func remove() {
         store.removeKey(for: provider)
         key = ""
+        AuditLog.shared.record(.provider, "\(provider.name) key removed", outcome: .info)
         toast = .info("\(provider.name) key removed")
     }
 
@@ -247,9 +252,14 @@ struct AIProviderPane: View {
         Task {
             let result = await AIProviderClient.test(provider, key: testKey, baseURL: testURL)
             switch result {
-            case .ok(let msg): toast = .success(msg)
-            case .failed(let msg): toast = .error(msg)
-            case .unsupported(let msg): toast = .info(msg)
+            case .ok(let msg):
+                AuditLog.shared.record(.provider, "\(provider.name) test passed")
+                toast = .success(msg)
+            case .failed(let msg):
+                AuditLog.shared.record(.provider, "\(provider.name) test failed", detail: msg, outcome: .failure)
+                toast = .error(msg)
+            case .unsupported(let msg):
+                toast = .info(msg)
             }
             testing = false
         }

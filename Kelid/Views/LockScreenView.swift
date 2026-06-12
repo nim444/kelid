@@ -146,8 +146,10 @@ struct LockScreenView: View {
         let ok = await TouchIDService.authenticate(reason: "unlock Kelid")
         checking = false
         if ok {
+            AuditLog.shared.record(.session, "Unlocked", detail: "Touch ID")
             store.unlock()
         } else {
+            AuditLog.shared.record(.session, "Unlock failed", detail: "Touch ID", outcome: .failure)
             errorMessage = "Touch ID was not confirmed."
         }
     }
@@ -161,8 +163,10 @@ struct LockScreenView: View {
             passphrase = "" // drop from memory regardless of outcome
             checking = false
             if ok {
+                AuditLog.shared.record(.session, "Unlocked", detail: "Passphrase")
                 store.unlock()
             } else {
+                AuditLog.shared.record(.session, "Unlock failed", detail: "Wrong passphrase", outcome: .failure)
                 errorMessage = "Wrong passphrase."
             }
         }

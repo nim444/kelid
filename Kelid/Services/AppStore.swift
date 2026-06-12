@@ -93,12 +93,19 @@ final class AppStore {
         guard !isLocked, onboardingComplete, autoLockMinutes > 0 else { return }
         if Date().timeIntervalSince(lastActivity) >= Double(autoLockMinutes) * 60 {
             isLocked = true
+            let minutes = autoLockMinutes
+            Task { @MainActor in
+                AuditLog.shared.record(.session, "Locked", detail: "Auto — idle \(minutes) min")
+            }
         }
     }
 
     func lockNow() {
         guard onboardingComplete else { return }
         isLocked = true
+        Task { @MainActor in
+            AuditLog.shared.record(.session, "Locked", detail: "Manual")
+        }
     }
 
     func unlock() {
