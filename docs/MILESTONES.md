@@ -15,6 +15,62 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.8 — Guardian: AI judge + secret-level policy engine (2026-06-12)
+
+The Guardian (Svault 2.0's name for the AI judge) arrives as a working,
+testable subsystem ahead of the vault engine. **Kelid's deliberate change vs
+Svault: rate limiting and brute-force protection live on the secret, not the
+vault** — every limit, burst ceiling, and seal is a property of the individual
+secret, counted across all callers so rotating caller names doesn't help.
+
+- `Models/GuardianModels.swift` — `Tier` (low/medium/high), `Guardian`
+  (provider ref + model + allow/high thresholds + criteria; API key stays in
+  the provider's Keychain entry), `SecretRule` (scope, tier, requireReason,
+  purpose, **per-secret rateLimit** "5/hour", requiredCallers), `Seal`.
+- `Services/PolicyEngine.swift` — pure pipeline in Svault's gate order:
+  sealed → reason ≥10 chars → required callers → per-secret rate limit →
+  per-caller burst (5/10s) → per-secret burst (10/10s) → tier gate. Svault
+  constants: seal at 5 denials/300s (medium/high only, any caller).
+- `Services/JudgeClient.swift` — Svault's judge prompt verbatim (JSON-only
+  verdict, 0–100 score); OpenAI-shaped chat completions (OpenRouter, OpenAI,
+  LM Studio, Ollama via /v1) + native Anthropic messages API; 6s cloud /
+  120s local timeouts; lenient JSON verdict extraction; `listModels` for the
+  wizard. No secret values ever appear in prompts.
+- `Services/GuardianStore.swift` — guardians/rules/flags in UserDefaults
+  (no secrets), seals + activity window in `guardian-state.json` (0600) so
+  seals survive restarts. `evaluate(...)` runs gates, calls the judge for
+  medium/high (or low + requireReason), applies thresholds (high tier uses
+  highThreshold), Svault failure semantics (medium fail-open flagged, high
+  fail-closed), records activity, triggers seals, audits everything.
+  `unseal` clears the seal + its denial window (else it would instantly
+  re-seal).
+- `Views/Guardian/GuardianWizard.swift` — Svault's exact 3-step wizard:
+  1) Provider (configured ones only, logos, honest empty state), 2) Model
+  (live list, "(recommended)" pre-selected — gemini-2.5-flash on OpenRouter —
+  free-text fallback), 3) Tuning (name, allow 60 / high 80 steppers,
+  criteria). First guardian flips the global switch on. Plus
+  `RuleEditorSheet` for per-secret rules with rate-limit format validation.
+- `Views/Guardian/GuardianTestConsole.swift` — `svault judge test` as GUI:
+  pick rule + caller + stated reason → runs the REAL pipeline → ALLOW/DENY
+  verdict card with 0–100 score gauge, rationale, and a SECRET SEALED badge
+  when a denial trips the threshold.
+- `Views/Guardian/GuardianView.swift` — status card (operational check:
+  global switch + provider credential), guardian cards (default badge, edit,
+  delete), Secret Rules list (tier chips, SEALED marker), Sealed Secrets card
+  with human-only **Unseal** (fresh Touch ID / password, mirroring Svault's
+  fresh-credential rule; denial audited).
+- Sidebar: Guardian between Dashboard and Audit. New `.guardian` audit
+  category: guardian created/updated/deleted, request allowed/denied (with
+  score), secret sealed, seal cleared, unseal denied.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive. User
+test: wizard with OpenRouter → rule DB_URL (medium, 3/hour) → good reason
+allows with score, vague reason denies, 5 denials seal it, unseal via Touch
+ID, rate limit trips on the 4th allowed read in an hour; Audit shows the
+whole trail.
+
+---
+
 ## Milestone 3.7 — tamper-evident audit log + Audit section (2026-06-12)
 
 "Everything is audited" becomes real: an append-only, hash-chained audit log
