@@ -6,12 +6,22 @@ import SwiftUI
 struct VaultsView: View {
     @Environment(VaultsStore.self) private var store
     @Environment(GuardianStore.self) private var guardians
+    @Environment(SecretsStore.self) private var secrets
 
     @State private var wizardVault: Vault?
     @State private var showWizard = false
+    @State private var openVaultID: UUID?
     @State private var toast: Toast?
 
     var body: some View {
+        if let openVaultID, let vault = store.vaults.first(where: { $0.id == openVaultID }) {
+            SecretsView(vault: vault) { self.openVaultID = nil }
+        } else {
+            vaultList
+        }
+    }
+
+    private var vaultList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 headerRow
@@ -91,6 +101,7 @@ struct VaultsView: View {
                         .lineLimit(2)
                 }
                 HStack(spacing: 6) {
+                    chip("\(secrets.secrets(for: vault.id).count) secret\(secrets.secrets(for: vault.id).count == 1 ? "" : "s")", .blue)
                     chip("tier \(vault.defaultTier.rawValue)", tierColor(vault.defaultTier))
                     chip(guardianLabel(vault), vault.guardianEnabled && !guardians.guardians.isEmpty ? .green : .orange)
                     chip(vault.agentMode.title, .secondary)
@@ -105,6 +116,17 @@ struct VaultsView: View {
 
             HStack(spacing: 6) {
                 Button {
+                    openVaultID = vault.id
+                } label: {
+                    Label("Open", systemImage: "chevron.right")
+                        .font(.kelid(11, .semibold))
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .help("Open the vault's secrets")
+
+                Button {
                     wizardVault = vault
                     showWizard = true
                 } label: {
@@ -115,6 +137,7 @@ struct VaultsView: View {
                 .help("Edit vault settings")
 
                 Button(role: .destructive) {
+                    secrets.removeAll(for: vault.id)
                     store.remove(vault)
                     AuditLog.shared.record(.system, "Vault deleted", detail: vault.name, outcome: .info)
                     toast = .info("\(vault.name) deleted")
@@ -123,7 +146,7 @@ struct VaultsView: View {
                 }
                 .buttonStyle(.glass)
                 .controlSize(.small)
-                .help("Delete vault")
+                .help("Delete vault and its secrets")
             }
         }
         .padding(16)

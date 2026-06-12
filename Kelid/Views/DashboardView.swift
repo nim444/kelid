@@ -4,6 +4,7 @@ import SwiftUI
 /// sidebar are provided by MainWindowView.
 struct DashboardPane: View {
     @Environment(VaultsStore.self) private var vaults
+    @Environment(SecretsStore.self) private var secrets
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -23,8 +24,8 @@ struct DashboardPane: View {
                     statCard(
                         icon: "key.horizontal",
                         title: "Secrets",
-                        value: "0",
-                        hint: "Secrets live inside vaults"
+                        value: "\(secrets.totalCount)",
+                        hint: secrets.totalCount == 0 ? "Secrets live inside vaults" : "Keychain-held until the crypto core"
                     )
                     statCard(
                         icon: "cpu",

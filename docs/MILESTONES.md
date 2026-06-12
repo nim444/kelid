@@ -15,6 +15,50 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 4.0 — secrets inside vaults (2026-06-12)
+
+Vaults now hold secrets — Svault's Secrets screen ported, with Kelid's
+per-secret rate limit and seal controls. Next: daemon + MCP gateway, where
+the dormant PolicyEngine goes live against these secrets.
+
+**Storage (no-plaintext rule honored).** Secret VALUES live in the macOS
+Keychain — one entry per secret (`vault.<vaultID>.<name>`, OS-encrypted,
+ThisDeviceOnly), the same mechanism as provider keys. Only metadata
+(name, scope, tier, flags, rate limit, callers, windows) is in the registry.
+The crypto core later migrates values into the vault's own AES-256-GCM
+store. No secret value ever touches disk unencrypted.
+
+- `Models/VaultSecret.swift` — name, scope, tier, requireReason, description,
+  requiredCallers, timeWindows, **per-secret rateLimit**, lastReadAt.
+- `Services/SecretsStore.swift` — secrets per vault (UserDefaults metadata),
+  values via KeychainStore, seals in `secrets-state.json` (0600). Vault
+  deletion sweeps its Keychain entries and seals.
+- `Views/Vaults/SecretWizard.swift` — Svault's 2-step wizard: **Secret**
+  (name locked on edit, value SecureField with "unchanged" placeholder on
+  edit + reveal toggle, scope) → **Access rules** (tier radio cards with the
+  no-guardian warning, "Always ask the guardian — even at low tier",
+  description, **rate limit** stepper defaulted from the vault, allowed
+  callers, time windows). Svault's hint texts carried over.
+- `Views/Vaults/SecretsView.swift` — per-vault secret cards (scope/tier/
+  sealed/always-judged badges, rate + callers + window + last-read line),
+  actions: **Reveal** (fresh Touch ID / password → audited modal with
+  concealed-clipboard Copy), Edit, **Seal** (manual panic button — every
+  request denies until unsealed), **Unseal** (fresh auth, denial audited),
+  Delete (confirm dialog: cannot be undone).
+- VaultsView: Open button → SecretsView (back chevron), secrets-count chip,
+  vault delete removes its secrets. Dashboard Secrets stat live.
+- New `.secret` audit category: added / updated (value replaced flagged) /
+  deleted / value revealed / reveal denied / sealed / seal cleared / unseal
+  denied.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive. User
+test: open vault → Add Secret (2 steps) → card shows badges; Reveal asks
+Touch ID, shows value, Copy is concealed; Seal marks the card sealed; Unseal
+asks Touch ID; deleting the vault removes its secrets; Audit logs the trail
+and Dashboard counts update.
+
+---
+
 ## Milestone 3.9 — Guardian is judges-only + Vaults section with wizard (2026-06-12)
 
 User correction on 3.8: the Guardian section had grown secret rules and seals
