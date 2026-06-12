@@ -53,4 +53,15 @@ struct Vault: Codable, Identifiable, Hashable {
             }
         }
     }
+
+    /// The agent-serving window after the last human unlock; nil = no limit.
+    var autoLockSeconds: TimeInterval? {
+        guard autoLock else { return nil }
+        switch autoLockTimer {
+        case "30m": return 30 * 60
+        case "12h": return 12 * 3600
+        case "1d": return 24 * 3600
+        default: return 30 * 60
+        }
+    }
 }

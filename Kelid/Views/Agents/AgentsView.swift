@@ -6,6 +6,7 @@ import SwiftUI
 /// (policy + guardian) rules every request.
 struct AgentsView: View {
     @Environment(McpStore.self) private var mcp
+    @Environment(AppStore.self) private var app
 
     @State private var portText = ""
     @State private var copied = false
@@ -68,6 +69,10 @@ struct AgentsView: View {
 
             Divider().opacity(0.3)
 
+            sessionToggle
+
+            Divider().opacity(0.3)
+
             HStack(spacing: 10) {
                 Text("Port")
                     .font(.kelid(12, .medium))
@@ -89,6 +94,26 @@ struct AgentsView: View {
                     .font(.kelid(10, .regular))
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    private var sessionToggle: some View {
+        @Bindable var app = app
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $app.serveAgentsWhileLocked) {
+                Text("Keep serving agents while the GUI is locked")
+                    .font(.kelid(12, .medium))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .onChange(of: app.serveAgentsWhileLocked) { _, on in
+                AuditLog.shared.record(.agent, on ? "Background serving enabled" : "Background serving disabled", outcome: .info)
+            }
+
+            Text("The lock screen protects the human interface; agents have their own session. They are never served before your first unlock, and each vault stops serving after its own auto-lock window (set in the vault wizard) since that unlock. Turn this off to make the GUI lock cut agents off too.")
+                .font(.kelid(10, .regular))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

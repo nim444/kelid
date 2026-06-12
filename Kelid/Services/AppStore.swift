@@ -34,6 +34,7 @@ final class AppStore {
         static let touchIDEnrolled = "touchid_enrolled"
         static let autoLockMinutes = "auto_lock_minutes"
         static let preferredUnlock = "preferred_unlock"
+        static let serveAgentsWhileLocked = "serve_agents_while_locked"
     }
 
     var onboardingComplete: Bool {
@@ -61,6 +62,17 @@ final class AppStore {
     /// no app content is rendered underneath.
     var isLocked: Bool
 
+    /// The GUI lock protects the human interface; agents are a separate
+    /// session. When true, the MCP gateway keeps serving while the GUI is
+    /// locked — bounded per vault by its own auto-lock timer.
+    var serveAgentsWhileLocked: Bool {
+        didSet { UserDefaults.standard.set(serveAgentsWhileLocked, forKey: Keys.serveAgentsWhileLocked) }
+    }
+
+    /// Set on every successful human unlock. Agents are never served before
+    /// the first unlock of a session; vault auto-lock timers count from here.
+    private(set) var lastUnlockedAt: Date?
+
     private var lastActivity = Date()
     private var idleTimer: Timer?
     private var eventMonitor: Any?
@@ -72,6 +84,7 @@ final class AppStore {
         touchIDEnrolled = defaults.bool(forKey: Keys.touchIDEnrolled)
         autoLockMinutes = defaults.object(forKey: Keys.autoLockMinutes) as? Int ?? 5
         preferredUnlock = UnlockMethod(rawValue: defaults.string(forKey: Keys.preferredUnlock) ?? "") ?? .touchID
+        serveAgentsWhileLocked = defaults.object(forKey: Keys.serveAgentsWhileLocked) as? Bool ?? true
         // A secrets app starts locked: every launch requires authentication.
         isLocked = onboarded && MasterKeyStore.masterExists
     }
@@ -110,6 +123,7 @@ final class AppStore {
 
     func unlock() {
         lastActivity = Date()
+        lastUnlockedAt = Date()
         isLocked = false
     }
 }

@@ -15,6 +15,31 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 4.2 — GUI lock vs agent session split (2026-06-12)
+
+User question: should auto-lock cut off MCP? Answer (matching Svault's
+daemon-vs-TUI separation): the GUI lock is the human's; agents get their own
+session.
+
+- `AppStore.serveAgentsWhileLocked` (default ON, explicit toggle in Agents
+  with audit on change) — the GUI lock screen no longer cuts agents off
+  unless the user wants it to.
+- `AppStore.lastUnlockedAt` — agents are **never served before the first
+  human unlock** of a session (launch starts locked, so a reboot serves
+  nothing until you authenticate).
+- The vault wizard's auto-lock timer becomes real enforcement:
+  `Vault.autoLockSeconds` (30m/12h/1d) bounds agent serving since the last
+  unlock — a forgotten unlock doesn't serve forever. Expired → "vault
+  auto-locked — a human must unlock Kelid again"; `kelid_list_vaults`
+  reports per-vault unlocked state from the same logic.
+
+**Verification.** CLI build SUCCEEDED. **No wipe.** User test: unlock, lock
+with Cmd+L, agent request still flows (toggle on); flip the toggle off →
+locked message; wait past the vault's 30m window (or set a short one) →
+auto-locked message until the next unlock.
+
+---
+
 ## Milestone 4.1 — MCP agent gateway (2026-06-12)
 
 Agents can now actually ask. The dormant PolicyEngine goes live: Kelid runs a

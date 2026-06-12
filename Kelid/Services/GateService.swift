@@ -43,24 +43,41 @@ final class GateService {
     // MARK: - Tools
 
     func listVaults() -> [[String: Any]] {
-        let unlocked = !app.isLocked
-        return vaults.vaults.map { vault in
+        vaults.vaults.map { vault in
             [
                 "name": vault.name,
-                "unlocked": unlocked,
+                "unlocked": agentSessionOpen(for: vault) == nil,
                 "description": vault.vaultDescription,
             ]
         }
     }
 
-    func getSecret(vaultName: String, name: String, scope: String, reason: String, caller: String) async -> Outcome {
-        // Serve only from unlocked state — an agent can never unlock.
-        guard !app.isLocked else {
-            return .locked("Kelid is locked — a human must unlock it before secrets can be served")
+    /// Whether agents may be served from this vault right now. The GUI lock
+    /// is the human's; agents have their own session: never before the first
+    /// unlock, optionally through a GUI lock, and bounded by the vault's own
+    /// auto-lock timer. Returns nil when open, else the locked message.
+    private func agentSessionOpen(for vault: Vault) -> String? {
+        guard let unlockedAt = app.lastUnlockedAt else {
+            return "Kelid has not been unlocked yet — a human must unlock it before secrets can be served"
         }
+        if app.isLocked, !app.serveAgentsWhileLocked {
+            return "Kelid is locked — a human must unlock it before secrets can be served"
+        }
+        if let window = vault.autoLockSeconds,
+           Date.now.timeIntervalSince(unlockedAt) > window {
+            return "vault '\(vault.name)' auto-locked (\(vault.autoLockTimer) after the last unlock) — a human must unlock Kelid again"
+        }
+        return nil
+    }
 
+    func getSecret(vaultName: String, name: String, scope: String, reason: String, caller: String) async -> Outcome {
         guard let vault = vaults.vaults.first(where: { $0.name == vaultName }) else {
             return .notFound("no vault named '\(vaultName)' — use kelid_list_vaults to discover vault names")
+        }
+
+        // Serve only from an open agent session — an agent can never unlock.
+        if let lockedMessage = agentSessionOpen(for: vault) {
+            return .locked(lockedMessage)
         }
 
         // Vault-level door: who may even ask.
