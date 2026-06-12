@@ -53,6 +53,10 @@ nonisolated final class FidoHidDevice {
     }
 
     deinit {
+        // Unregister + unschedule BEFORE freeing the report buffer — a report
+        // arriving mid-teardown must never write into freed memory.
+        IOHIDDeviceRegisterInputReportCallback(device, reportBacking, Self.reportSize, nil, nil)
+        IOHIDDeviceUnscheduleFromRunLoop(device, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
         IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
         reportBacking.deinitialize(count: Self.reportSize)
         reportBacking.deallocate()

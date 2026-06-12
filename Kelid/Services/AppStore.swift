@@ -38,7 +38,14 @@ final class AppStore {
     }
 
     var onboardingComplete: Bool {
-        didSet { UserDefaults.standard.set(onboardingComplete, forKey: Keys.onboardingComplete) }
+        didSet {
+            UserDefaults.standard.set(onboardingComplete, forKey: Keys.onboardingComplete)
+            // Finishing onboarding is an authenticated human session — open
+            // the agent session too, no redundant lock/unlock cycle needed.
+            if onboardingComplete, !oldValue {
+                lastUnlockedAt = Date()
+            }
+        }
     }
 
     /// Milestone-1: records the user's choice and a successful biometric check.

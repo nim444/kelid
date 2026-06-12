@@ -52,32 +52,41 @@ final class GateService {
         }
     }
 
+    /// What every locked vault tells an agent — one message for every locked
+    /// state, so the caller can't probe lock configuration. The real reason
+    /// goes to the audit log.
+    static let genericLocked = "Kelid is locked — a human must unlock it before secrets can be served"
+
     /// Whether agents may be served from this vault right now. The GUI lock
     /// is the human's; agents have their own session: never before the first
     /// unlock, optionally through a GUI lock, and bounded by the vault's own
-    /// auto-lock timer. Returns nil when open, else the locked message.
+    /// auto-lock timer. Returns nil when open, else the internal reason
+    /// (audit-only — agents get `genericLocked`).
     private func agentSessionOpen(for vault: Vault) -> String? {
         guard let unlockedAt = app.lastUnlockedAt else {
-            return "Kelid has not been unlocked yet — a human must unlock it before secrets can be served"
+            return "never unlocked this session"
         }
         if app.isLocked, !app.serveAgentsWhileLocked {
-            return "Kelid is locked — a human must unlock it before secrets can be served"
+            return "GUI locked and background serving is off"
         }
         if let window = vault.autoLockSeconds,
            Date.now.timeIntervalSince(unlockedAt) > window {
-            return "vault '\(vault.name)' auto-locked (\(vault.autoLockTimer) after the last unlock) — a human must unlock Kelid again"
+            return "vault auto-locked (\(vault.autoLockTimer) after the last unlock)"
         }
         return nil
     }
 
     func getSecret(vaultName: String, name: String, scope: String, reason: String, caller: String) async -> Outcome {
         guard let vault = vaults.vaults.first(where: { $0.name == vaultName }) else {
+            // Vault names are public via kelid_list_vaults, so this message
+            // discloses nothing the caller couldn't already learn.
             return .notFound("no vault named '\(vaultName)' — use kelid_list_vaults to discover vault names")
         }
 
         // Serve only from an open agent session — an agent can never unlock.
-        if let lockedMessage = agentSessionOpen(for: vault) {
-            return .locked(lockedMessage)
+        if let lockedReason = agentSessionOpen(for: vault) {
+            AuditLog.shared.record(.agent, "Request while locked", detail: "\(vault.name)/\(name) — \(caller): \(lockedReason) [mcp]", outcome: .denied)
+            return .locked(Self.genericLocked)
         }
 
         // Vault-level door: who may even ask.
@@ -92,8 +101,11 @@ final class GateService {
             break
         }
 
+        // Secret names are never disclosed: a missing secret answers with the
+        // same generic denial as a refused one, so a vault-allowed caller
+        // cannot enumerate which names exist.
         guard let secret = secrets.secrets(for: vault.id).first(where: { $0.name == name }) else {
-            return .notFound("secret '\(name)' not found")
+            return deny(vault: vault, secretName: name, caller: caller, why: "no such secret", secret: nil)
         }
 
         // Stated scope must match the secret's scope.
@@ -184,7 +196,10 @@ final class GateService {
 
     private func grant(vault: Vault, secret: VaultSecret, caller: String, score: Int?, note: String) -> Outcome {
         guard let value = secrets.revealValue(of: secret, in: vault.id) else {
-            return .notFound("secret '\(secret.name)' has no stored value")
+            // Operational fault, not policy — but the agent still gets the
+            // generic denial. The real cause goes to the audit log.
+            AuditLog.shared.record(.secret, "Value missing", detail: "\(vault.name)/\(secret.name) — gate allowed but no Keychain value found", outcome: .failure)
+            return .denied
         }
         record(vault: vault, secret: secret, caller: caller, allowed: true)
         let scoreText = score.map { " (score \($0))" } ?? ""
@@ -261,50 +276,82 @@ final class GateService {
     }
 
     private func matches(window: String, now: Date) -> Bool {
+        guard let parsed = Self.parseWindow(window) else { return false }
+        let calendar = Calendar.current
+        if let days = parsed.days, !Self.dayMatches(days, weekday: calendar.component(.weekday, from: now)) {
+            return false
+        }
+        let nowMinutes = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
+        if parsed.start <= parsed.end {
+            return nowMinutes >= parsed.start && nowMinutes < parsed.end // start inclusive, end exclusive
+        }
+        // Overnight window, e.g. 22:00-06:00 — wraps past midnight.
+        return nowMinutes >= parsed.start || nowMinutes < parsed.end
+    }
+
+    /// Strict parse of one window spec. Returns nil for invalid syntax so the
+    /// wizard can reject it at entry — a stored-but-unparseable window would
+    /// silently deny at all times.
+    nonisolated static func parseWindow(_ window: String) -> (days: String?, start: Int, end: Int)? {
         let parts = window.lowercased().split(separator: " ").map(String.init)
         let dayPart: String?
         let timePart: String
         switch parts.count {
         case 1: dayPart = nil; timePart = parts[0]
         case 2: dayPart = parts[0]; timePart = parts[1]
-        default: return false
+        default: return nil
         }
-
-        let calendar = Calendar.current
-        if let dayPart, !dayMatches(dayPart, weekday: calendar.component(.weekday, from: now)) {
-            return false
-        }
-
+        if let dayPart, !daySpecValid(dayPart) { return nil }
         let range = timePart.split(separator: "-").map(String.init)
         guard range.count == 2,
               let start = minutes(range[0]), let end = minutes(range[1])
-        else { return false }
-        let nowMinutes = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
-        return nowMinutes >= start && nowMinutes < end // start inclusive, end exclusive
+        else { return nil }
+        return (dayPart, start, end)
     }
 
-    private func dayMatches(_ spec: String, weekday: Int) -> Bool {
+    nonisolated static func windowValid(_ window: String) -> Bool {
+        parseWindow(window) != nil
+    }
+
+    private nonisolated static let dayNames = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+    private nonisolated static func daySpecValid(_ spec: String) -> Bool {
+        let tokens = spec.split(separator: ",").map(String.init)
+        guard !tokens.isEmpty else { return false }
+        for token in tokens {
+            if token.contains("-") {
+                let bounds = token.split(separator: "-").map(String.init)
+                guard bounds.count == 2, dayNames.contains(bounds[0]), dayNames.contains(bounds[1]) else {
+                    return false
+                }
+            } else if !dayNames.contains(token) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private nonisolated static func dayMatches(_ spec: String, weekday: Int) -> Bool {
         // Calendar weekday: 1=sun ... 7=sat. Map to mon=0 ... sun=6.
         let today = (weekday + 5) % 7
-        let names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
         for token in spec.split(separator: ",").map(String.init) {
             if token.contains("-") {
                 let bounds = token.split(separator: "-").map(String.init)
                 guard bounds.count == 2,
-                      let lo = names.firstIndex(of: bounds[0]),
-                      let hi = names.firstIndex(of: bounds[1])
+                      let lo = dayNames.firstIndex(of: bounds[0]),
+                      let hi = dayNames.firstIndex(of: bounds[1])
                 else { continue }
                 if lo <= hi ? (today >= lo && today <= hi) : (today >= lo || today <= hi) {
                     return true
                 }
-            } else if names.firstIndex(of: token) == today {
+            } else if dayNames.firstIndex(of: token) == today {
                 return true
             }
         }
         return false
     }
 
-    private func minutes(_ hhmm: String) -> Int? {
+    private nonisolated static func minutes(_ hhmm: String) -> Int? {
         let parts = hhmm.split(separator: ":").map(String.init)
         guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]),
               (0...23).contains(h), (0...59).contains(m)

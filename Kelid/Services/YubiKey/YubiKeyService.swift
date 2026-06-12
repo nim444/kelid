@@ -95,7 +95,10 @@ nonisolated enum YubiKeyService {
             throw EnrollError.failed(error.localizedDescription)
         }
         guard let info = try? CBOR.decode(response) else {
-            return AuthenticatorInfo(supportsHmacSecret: true, clientPinSet: false)
+            // Fail closed: a key whose capabilities can't be read must not be
+            // assumed to support hmac-secret — a silent no-op enrollment would
+            // only fail much later, at unlock time.
+            return AuthenticatorInfo(supportsHmacSecret: false, clientPinSet: false)
         }
 
         // extensions (key 2): require hmac-secret if a list is present.

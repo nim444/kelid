@@ -17,3 +17,28 @@ struct VaultSecret: Codable, Identifiable, Hashable {
     var createdAt: Date = .now
     var lastReadAt: Date?
 }
+
+extension VaultSecret {
+    /// Tolerant decoding: new fields in later releases must never make stored
+    /// metadata undecodable (that would reset the store and orphan the
+    /// Keychain values). Only `name` is required.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        scope = (try? c.decode(String.self, forKey: .scope)) ?? "misc"
+        tier = (try? c.decode(Tier.self, forKey: .tier)) ?? .medium
+        requireReason = (try? c.decode(Bool.self, forKey: .requireReason)) ?? false
+        secretDescription = (try? c.decode(String.self, forKey: .secretDescription)) ?? ""
+        requiredCallers = (try? c.decode([String].self, forKey: .requiredCallers)) ?? []
+        timeWindows = (try? c.decode([String].self, forKey: .timeWindows)) ?? []
+        rateLimit = (try? c.decode(String.self, forKey: .rateLimit)) ?? "10/hour"
+        createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? .now
+        lastReadAt = try? c.decode(Date.self, forKey: .lastReadAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, scope, tier, requireReason, secretDescription
+        case requiredCallers, timeWindows, rateLimit, createdAt, lastReadAt
+    }
+}

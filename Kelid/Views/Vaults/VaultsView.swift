@@ -11,6 +11,7 @@ struct VaultsView: View {
     @State private var wizardVault: Vault?
     @State private var showWizard = false
     @State private var openVaultID: UUID?
+    @State private var deleteTarget: Vault?
     @State private var toast: Toast?
 
     var body: some View {
@@ -45,6 +46,30 @@ struct VaultsView: View {
         .sheet(isPresented: $showWizard) {
             VaultWizard(existing: wizardVault)
         }
+        .confirmationDialog(
+            "Delete this vault?",
+            isPresented: Binding(
+                get: { deleteTarget != nil },
+                set: { if !$0 { deleteTarget = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: deleteTarget
+        ) { vault in
+            Button("Delete \u{201C}\(vault.name)\u{201D} and its secrets", role: .destructive) {
+                delete(vault)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { vault in
+            let count = secrets.secrets(for: vault.id).count
+            Text("This permanently deletes the vault, its policies, and its \(count) secret\(count == 1 ? "" : "s") — values included. This cannot be undone.")
+        }
+    }
+
+    private func delete(_ vault: Vault) {
+        secrets.removeAll(for: vault.id)
+        store.remove(vault)
+        AuditLog.shared.record(.system, "Vault deleted", detail: vault.name, outcome: .info)
+        toast = .info("\(vault.name) deleted")
     }
 
     private var headerRow: some View {
@@ -137,10 +162,7 @@ struct VaultsView: View {
                 .help("Edit vault settings")
 
                 Button(role: .destructive) {
-                    secrets.removeAll(for: vault.id)
-                    store.remove(vault)
-                    AuditLog.shared.record(.system, "Vault deleted", detail: vault.name, outcome: .info)
-                    toast = .info("\(vault.name) deleted")
+                    deleteTarget = vault
                 } label: {
                     Image(systemName: "trash").font(.system(size: 11))
                 }

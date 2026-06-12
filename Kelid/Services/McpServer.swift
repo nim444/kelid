@@ -47,8 +47,13 @@ final class McpStore {
     }
 
     func noteCaller(_ caller: String) {
-        guard !knownCallers.contains(caller) else { return }
-        knownCallers.append(caller)
+        // Caller strings are agent-controlled: cap entry length and list size.
+        let trimmed = String(caller.prefix(64))
+        guard !knownCallers.contains(trimmed) else { return }
+        knownCallers.append(trimmed)
+        if knownCallers.count > 20 {
+            knownCallers.removeFirst(knownCallers.count - 20)
+        }
         UserDefaults.standard.set(knownCallers, forKey: Keys.callers)
     }
 
@@ -70,19 +75,23 @@ final class McpStore {
                     await self?.handleBody(body)
                 }
             }
-            listener.stateUpdateHandler = { [weak self] state in
+            listener.stateUpdateHandler = { [weak self, weak listener] state in
                 Task { @MainActor in
+                    // A cancelled listener's events may arrive after a restart
+                    // already installed its successor — never let the old one
+                    // clobber the new one's state.
+                    guard let self, let listener, self.listener === listener else { return }
                     switch state {
                     case .ready:
-                        self?.running = true
-                        self?.lastError = nil
+                        self.running = true
+                        self.lastError = nil
                     case .failed(let error):
-                        self?.running = false
-                        self?.lastError = error.localizedDescription
-                        self?.listener = nil
+                        self.running = false
+                        self.lastError = error.localizedDescription
+                        self.listener = nil
                     case .cancelled:
-                        self?.running = false
-                        self?.listener = nil
+                        self.running = false
+                        self.listener = nil
                     default:
                         break
                     }
@@ -97,8 +106,12 @@ final class McpStore {
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        guard let listener else {
+            running = false
+            return
+        }
+        listener.cancel()
+        self.listener = nil
         running = false
         AuditLog.shared.record(.agent, "MCP gateway stopped", outcome: .info)
     }
@@ -197,7 +210,10 @@ final class McpStore {
 
         switch tool {
         case "kelid_list_vaults":
-            guard let gate else { return rpcError(id, code: -32603, message: "gateway not ready") }
+            // The human's enable switch is honored even if a listener lingers.
+            guard enabled, let gate else {
+                return ok(id, toolText("request not available", isError: true))
+            }
             let list = gate.listVaults()
             let data = (try? JSONSerialization.data(withJSONObject: list, options: [.prettyPrinted, .sortedKeys])) ?? Data()
             return ok(id, toolText(String(decoding: data, as: UTF8.self), isError: false))
@@ -258,6 +274,12 @@ final class McpStore {
 nonisolated enum McpHttp {
     typealias Handler = @Sendable (Data) async -> Data?
 
+    /// Local clients only, but still hostile-input territory: headers and
+    /// bodies are capped, Content-Length is validated, and browser-origin
+    /// requests are refused (a webpage can fire no-cors POSTs at loopback).
+    private static let maxHeaderBytes = 16 * 1024
+    private static let maxBodyBytes = 1 << 20 // 1 MiB
+
     static func serve(connection: NWConnection, handler: @escaping Handler) {
         connection.start(queue: .global(qos: .userInitiated))
         receive(connection: connection, buffer: Data(), handler: handler)
@@ -272,7 +294,8 @@ nonisolated enum McpHttp {
                 return
             }
 
-            if let request = parseRequest(buffer) {
+            switch parseRequest(buffer) {
+            case .request(let request):
                 Task {
                     let responseData = await respond(to: request, handler: handler)
                     connection.send(content: responseData, completion: .contentProcessed { _ in
@@ -280,10 +303,17 @@ nonisolated enum McpHttp {
                         receive(connection: connection, buffer: Data(leftover), handler: handler)
                     })
                 }
-            } else if isComplete {
-                connection.cancel()
-            } else {
-                receive(connection: connection, buffer: buffer, handler: handler)
+            case .bad:
+                let response = httpResponse(status: "400 Bad Request", body: Data())
+                connection.send(content: response, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            case .incomplete:
+                if isComplete {
+                    connection.cancel()
+                } else {
+                    receive(connection: connection, buffer: buffer, handler: handler)
+                }
             }
         }
     }
@@ -293,40 +323,76 @@ nonisolated enum McpHttp {
         var path: String
         var body: Data
         var totalLength: Int
+        var contentType: String
+        var origin: String?
     }
 
-    private static func parseRequest(_ data: Data) -> HttpRequest? {
-        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+    private enum ParseResult {
+        case request(HttpRequest)
+        case incomplete // wait for more bytes
+        case bad        // malformed or over limits — close the connection
+    }
+
+    private static func parseRequest(_ data: Data) -> ParseResult {
+        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else {
+            return data.count > maxHeaderBytes ? .bad : .incomplete
+        }
         let headerData = data[data.startIndex..<headerEnd.lowerBound]
+        guard headerData.count <= maxHeaderBytes else { return .bad }
         let header = String(decoding: headerData, as: UTF8.self)
         let lines = header.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first else { return nil }
+        guard let requestLine = lines.first else { return .bad }
         let parts = requestLine.split(separator: " ")
-        guard parts.count >= 2 else { return nil }
+        guard parts.count >= 2 else { return .bad }
 
         var contentLength = 0
+        var contentType = ""
+        var origin: String?
         for line in lines.dropFirst() {
             let pair = line.split(separator: ":", maxSplits: 1)
-            if pair.count == 2, pair[0].trimmingCharacters(in: .whitespaces).lowercased() == "content-length" {
-                contentLength = Int(pair[1].trimmingCharacters(in: .whitespaces)) ?? 0
+            guard pair.count == 2 else { continue }
+            let key = pair[0].trimmingCharacters(in: .whitespaces).lowercased()
+            let value = pair[1].trimmingCharacters(in: .whitespaces)
+            switch key {
+            case "content-length":
+                guard let length = Int(value), (0...maxBodyBytes).contains(length) else { return .bad }
+                contentLength = length
+            case "content-type":
+                contentType = value.lowercased()
+            case "origin":
+                origin = value
+            default:
+                break
             }
         }
 
         let bodyStart = headerEnd.upperBound
         let available = data.distance(from: bodyStart, to: data.endIndex)
-        guard available >= contentLength else { return nil } // wait for more bytes
+        guard available >= contentLength else { return .incomplete }
 
         let body = data[bodyStart..<data.index(bodyStart, offsetBy: contentLength)]
         let total = data.distance(from: data.startIndex, to: bodyStart) + contentLength
-        return HttpRequest(method: String(parts[0]), path: String(parts[1]), body: Data(body), totalLength: total)
+        return .request(HttpRequest(
+            method: String(parts[0]), path: String(parts[1]),
+            body: Data(body), totalLength: total,
+            contentType: contentType, origin: origin
+        ))
     }
 
     private static func respond(to request: HttpRequest, handler: Handler) async -> Data {
+        // MCP clients are local processes, not browsers: any Origin header
+        // means a webpage is probing loopback — refuse it outright.
+        guard request.origin == nil else {
+            return httpResponse(status: "403 Forbidden", body: Data())
+        }
         guard request.path == "/mcp" || request.path == "/" else {
             return httpResponse(status: "404 Not Found", body: Data())
         }
         switch request.method {
         case "POST":
+            guard request.contentType.contains("application/json") else {
+                return httpResponse(status: "415 Unsupported Media Type", body: Data())
+            }
             if let body = await handler(request.body) {
                 return httpResponse(status: "200 OK", body: body)
             }

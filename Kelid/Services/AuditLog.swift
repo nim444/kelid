@@ -58,14 +58,18 @@ struct AuditEvent: Codable, Identifiable, Hashable {
 }
 
 /// Append-only audit log: JSONL on disk (0600, inside the sandbox container),
-/// hash-chain verified on every load.
+/// hash-chain verified on every load. The chain alone cannot detect a
+/// truncated tail (a clean prefix still verifies), so the latest head hash +
+/// count are anchored in the Keychain and compared on load.
 @MainActor
 @Observable
 final class AuditLog {
     static let shared = AuditLog()
 
+    private static let anchorAccount = "audit.head"
+
     private(set) var events: [AuditEvent] = []
-    /// False if the on-disk log failed hash-chain verification.
+    /// False if the on-disk log failed hash-chain or head-anchor verification.
     private(set) var chainValid = true
 
     private var fileURL: URL {
@@ -97,6 +101,7 @@ final class AuditLog {
         )
         events.append(event)
         append(event)
+        KeychainStore.set("\(events.count)|\(event.hash)", account: Self.anchorAccount)
     }
 
     // MARK: - Persistence
@@ -133,7 +138,21 @@ final class AuditLog {
             }
         }
         events = loaded
-        chainValid = verifyChain(loaded)
+        chainValid = verifyChain(loaded) && headMatchesAnchor(loaded)
+    }
+
+    /// Detects tail truncation: the anchored head must be this chain's last
+    /// entry (or an earlier entry only when the app died between appending a
+    /// line and updating the anchor — then newer events follow it). An empty
+    /// file is a legitimate fresh start (wiped container); a non-empty chain
+    /// that doesn't contain the anchored head was replaced wholesale.
+    private func headMatchesAnchor(_ events: [AuditEvent]) -> Bool {
+        guard let anchor = KeychainStore.get(account: Self.anchorAccount) else { return true }
+        let parts = anchor.split(separator: "|", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let anchorCount = Int(parts[0]) else { return true }
+        if events.isEmpty { return true }
+        guard let index = events.firstIndex(where: { $0.hash == parts[1] }) else { return false }
+        return index == anchorCount - 1
     }
 
     private func verifyChain(_ events: [AuditEvent]) -> Bool {

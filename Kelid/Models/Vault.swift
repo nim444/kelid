@@ -65,3 +65,31 @@ struct Vault: Codable, Identifiable, Hashable {
         }
     }
 }
+
+extension Vault {
+    /// Tolerant decoding: a field added in a later release must never make
+    /// stored vaults undecodable — that would silently reset the store and
+    /// orphan every secret. Only `name` is required; everything else defaults.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        vaultDescription = (try? c.decode(String.self, forKey: .vaultDescription)) ?? ""
+        agentMode = (try? c.decode(AgentMode.self, forKey: .agentMode)) ?? .none
+        allowedCallers = (try? c.decode([String].self, forKey: .allowedCallers)) ?? []
+        defaultSecretRateLimit = (try? c.decode(String.self, forKey: .defaultSecretRateLimit)) ?? "10/hour"
+        defaultTier = (try? c.decode(Tier.self, forKey: .defaultTier)) ?? .medium
+        guardianEnabled = (try? c.decode(Bool.self, forKey: .guardianEnabled)) ?? true
+        assignedGuardianID = try? c.decode(UUID.self, forKey: .assignedGuardianID)
+        autoLock = (try? c.decode(Bool.self, forKey: .autoLock)) ?? true
+        autoLockTimer = (try? c.decode(String.self, forKey: .autoLockTimer)) ?? "30m"
+        loginMethod = (try? c.decode(LoginMethod.self, forKey: .loginMethod)) ?? .passphrase
+        createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? .now
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, vaultDescription, agentMode, allowedCallers
+        case defaultSecretRateLimit, defaultTier, guardianEnabled, assignedGuardianID
+        case autoLock, autoLockTimer, loginMethod, createdAt
+    }
+}

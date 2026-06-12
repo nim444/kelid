@@ -197,7 +197,7 @@ struct AuditView: View {
     // MARK: - Events
 
     private var eventList: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             if filtered.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "list.bullet.rectangle")

@@ -84,7 +84,9 @@ enum MasterKeyStore {
               let stored = Data(base64Encoded: record.verifierBase64)
         else { return false }
 
-        let rounds = record.iterations
+        // Floor at the shipped work factor: a rewritten record must not be
+        // able to lower the PBKDF2 cost below what Kelid ever wrote.
+        let rounds = max(record.iterations, iterations)
         let candidate = await Task.detached(priority: .userInitiated) {
             deriveVerifier(passphrase: passphrase, salt: salt, rounds: rounds)
         }.value
@@ -172,7 +174,8 @@ enum MasterKeyStore {
 
     private nonisolated static func randomBytes(_ count: Int) -> Data {
         var bytes = [UInt8](repeating: 0, count: count)
-        _ = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        precondition(status == errSecSuccess, "SecRandomCopyBytes failed (\(status))")
         return Data(bytes)
     }
 

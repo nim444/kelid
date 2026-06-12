@@ -15,6 +15,121 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 4.4 — Release prep: docs, metadata, packaging plan (2026-06-12)
+
+Getting ready for the first public alpha (DMG on GitHub Releases, ad-hoc
+signed like GGTyper, marked Pre-release).
+
+- **README rewritten** to match reality (it still claimed "nothing runnable
+  yet" and a stale KDF): what actually works, two Mermaid diagrams
+  (architecture + the full gate pipeline), install/connect instructions, an
+  honest interim-crypto note, requirements (macOS 27, Apple silicon),
+  credits, Required Notice.
+- **VISION.md** status updated from "pre-code" to the real pre-alpha state.
+- **Project metadata**: `MARKETING_VERSION` 0.1 → 0.1.0,
+  `NSHumanReadableCopyright`, `LSApplicationCategoryType`
+  (developer-tools). LICENSE gains the PolyForm Required Notice line.
+- **docs/RELEASE.md**: step-by-step alpha checklist — Release build, strip
+  `com.apple.security.get-task-allow` and re-sign with hardened runtime
+  (the release audit found an ad-hoc Release build ships debugger-attach
+  enabled), fresh-user smoke test, hdiutil DMG, tag + gh release, required
+  release-note disclosures, screenshots.
+- Repo hygiene: stray duplicate `password-svgrepo-com.svg` removed from the
+  root (the real copy lives in `Kelid/AppIcon.icon/Assets/`); `.gitignore`
+  gains `build-release/` and `DerivedData/`.
+
+**Verification.** CLI build SUCCEEDED. **No wipe.**
+
+---
+
+## Milestone 4.3 — Pre-release hardening from a triple subagent review (2026-06-12)
+
+Three parallel deep reviews (security, correctness, release readiness) over
+the whole codebase; every CRITICAL/HIGH and the cheap MEDIUMs fixed. **No
+wipe — all changes are backward compatible with existing data.**
+
+Security fixes:
+
+- **Secret-name enumeration closed** (`GateService`): a missing secret now
+  answers with the same generic denial as a refused one — a vault-allowed
+  caller can no longer probe which names exist. The "no stored value"
+  operational fault also returns the generic denial (real cause
+  audit-only).
+- **Locked-state probing closed**: one `genericLocked` message for every
+  locked state; the specific reason (never unlocked / GUI locked / vault
+  window expired) goes to the audit log, and locked agent requests are now
+  audited at all.
+- **Judge prompt-injection framing** (`JudgeClient`): agent-controlled
+  fields (`caller`, `reason`) are sanitized (control chars stripped,
+  length-capped) and wrapped in data tags; the system prompt declares tag
+  contents untrusted data and treats embedded instructions/verdicts as
+  grounds to deny.
+- **MCP HTTP parser hardened** (`McpHttp`): negative or oversized
+  Content-Length rejected (was a one-request crash via index trap), 16 KiB
+  header / 1 MiB body caps, malformed requests answered 400 and closed.
+  Browser drive-by defense: any `Origin` header → 403; POST requires
+  `Content-Type: application/json` (per MCP Streamable HTTP spec).
+- **Audit chain truncation detection** (`AuditLog`): the head hash + count
+  are anchored in the Keychain on every append; on load, a chain whose
+  anchored head sits mid-file (tail deleted) or is missing from a non-empty
+  file (log replaced) flags `chainValid = false`. A wiped container
+  restarting the log stays legitimate.
+- `MasterKeyStore`: PBKDF2 rounds floored at 600k on verify (a rewritten
+  master.json can't lower the work factor); `SecRandomCopyBytes` result now
+  precondition-checked.
+- `YubiKeyService.readInfo` fails closed: undecodable getInfo no longer
+  assumes hmac-secret support.
+- `McpStore.noteCaller`: agent-controlled caller strings capped (64 chars,
+  20 entries).
+
+Correctness fixes:
+
+- **Listener restart race** (`McpStore`): stale NWListener state events can
+  no longer clobber the successor after a port change (identity-guarded
+  handler) — this was the path to an orphaned port until app restart.
+- **Decode-failure data wipe prevented**: tolerant `init(from:)` for
+  `Vault`, `VaultSecret`, `Guardian`, `Seal` — adding a field in a later
+  release can never make stored metadata undecodable (which previously
+  reset stores to empty and orphaned Keychain values).
+- **Overnight time windows** ("22:00-06:00") now wrap past midnight instead
+  of never matching; window syntax is validated in the secret wizard with
+  the gate's own parser (`GateService.windowValid`) — a stored-but-invalid
+  window used to silently deny 24/7.
+- **Vault deletion now confirms** (was a single un-confirmed click
+  destroying all secrets) with a destructive confirmation dialog stating
+  the secret count.
+- `SecretsStore.add/update` report Keychain write failures (wizard shows
+  the error, audited; a secret can no longer exist without its value);
+  programmatic renames are guarded (Keychain/seal keys are name-based).
+- Telegram URL building no longer force-unwraps (a hostile pasted token was
+  a crash).
+- Passphrase minimum unified at 10 chars (change-pane allowed 8,
+  onboarding required 10).
+- Finishing onboarding now opens the agent session (`lastUnlockedAt`) — MCP
+  no longer says "not unlocked yet" while the freshly-onboarded human sits
+  in an unlocked app.
+- "Named only" agent mode requires at least one caller in the vault wizard.
+- `FidoHidDevice.deinit` unregisters the input-report callback and
+  unschedules from the run loop before freeing the report buffer (was a
+  potential use-after-free during teardown).
+- `kelid_list_vaults` honors the enable switch even if a listener lingers;
+  `stop()` no longer logs audit noise when nothing was running; AuditView
+  event list is lazy.
+
+Verified correct by the reviews (no change needed): no plaintext secret
+material on disk in any path; Keychain usage; PBKDF2/recovery-code
+generation; policy gate ordering and seal math (no off-by-one); generic
+denial discipline on the policy path; Telegram whitelist enforcement inside
+`send`; loopback-only listener; CTAP2 framing/crypto; entitlements scope.
+
+**Verification.** CLI build SUCCEEDED (Debug; Release verified by the
+review agents). User test: ask an agent for a nonexistent secret name →
+same generic denial as a refused one; create a secret with window
+"22:00-06:00" at night → served; try deleting a vault → confirmation
+dialog.
+
+---
+
 ## Milestone 4.2 — GUI lock vs agent session split (2026-06-12)
 
 User question: should auto-lock cut off MCP? Answer (matching Svault's

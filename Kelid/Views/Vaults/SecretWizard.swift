@@ -24,6 +24,7 @@ struct SecretWizard: View {
     @State private var windowsText = ""
     @State private var rateCount = 10
     @State private var rateUnit = "hour"
+    @State private var saveError: String?
 
     private var guardianActive: Bool {
         guardians.isOperational(providers: providers)
@@ -66,6 +67,16 @@ struct SecretWizard: View {
     }
 
     private var footer: some View {
+        VStack(spacing: 0) {
+            if let saveError {
+                PaneStatus(kind: .error, message: saveError)
+                    .padding(.horizontal, 20)
+            }
+            footerButtons
+        }
+    }
+
+    private var footerButtons: some View {
         HStack {
             Button("Cancel") { dismiss() }
                 .buttonStyle(.glass)
@@ -88,9 +99,17 @@ struct SecretWizard: View {
         .padding(20)
     }
 
+    private var parsedWindows: [String] {
+        windowsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    private var invalidWindow: String? {
+        parsedWindows.first { !GateService.windowValid($0) }
+    }
+
     private var canAdvance: Bool {
         guard step == 0 else {
-            return PolicyEngine.rateLimitParse("\(rateCount)/\(rateUnit)") != nil
+            return PolicyEngine.rateLimitParse("\(rateCount)/\(rateUnit)") != nil && invalidWindow == nil
         }
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return false }
@@ -210,10 +229,13 @@ struct SecretWizard: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.kelid(13, .regular))
 
-            fieldLabel("Time window", hint: "Only release during these times, comma-separated — e.g. mon-fri 09:00-18:00. Blank = any time.")
+            fieldLabel("Time window", hint: "Only release during these times, comma-separated — e.g. mon-fri 09:00-18:00 or 22:00-06:00 (overnight). Blank = any time.")
             TextField("blank = any time", text: $windowsText)
                 .textFieldStyle(.roundedBorder)
                 .font(.kelid(13, .regular))
+            if let invalidWindow {
+                PaneStatus(kind: .error, message: "\u{201C}\(invalidWindow)\u{201D} is not a valid window — use day names and 24h times, e.g. mon-fri 09:00-18:00.")
+            }
         }
     }
 
@@ -281,8 +303,9 @@ struct SecretWizard: View {
 
     private func save() {
         let callers = callersText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        let windows = windowsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let windows = parsedWindows
         let rate = "\(rateCount)/\(rateUnit)"
+        saveError = nil
 
         if var updated = existing {
             updated.scope = scope.trimmingCharacters(in: .whitespaces).isEmpty ? "misc" : scope.trimmingCharacters(in: .whitespaces)
@@ -292,7 +315,11 @@ struct SecretWizard: View {
             updated.requiredCallers = callers
             updated.timeWindows = windows
             updated.rateLimit = rate
-            store.update(updated, newValue: value.isEmpty ? nil : value, in: vault.id)
+            guard store.update(updated, newValue: value.isEmpty ? nil : value, in: vault.id) else {
+                saveError = "The Keychain refused the new value — nothing was changed. Try again."
+                AuditLog.shared.record(.secret, "Secret update failed", detail: "\(vault.name)/\(updated.name) — Keychain write failed", outcome: .failure)
+                return
+            }
             AuditLog.shared.record(.secret, "Secret updated", detail: "\(vault.name)/\(updated.name)\(value.isEmpty ? "" : " (value replaced)")")
         } else {
             let secret = VaultSecret(
@@ -305,7 +332,11 @@ struct SecretWizard: View {
                 timeWindows: windows,
                 rateLimit: rate
             )
-            store.add(secret, value: value, to: vault.id)
+            guard store.add(secret, value: value, to: vault.id) else {
+                saveError = "The Keychain refused the value — the secret was not created. Try again."
+                AuditLog.shared.record(.secret, "Secret add failed", detail: "\(vault.name)/\(secret.name) — Keychain write failed", outcome: .failure)
+                return
+            }
             AuditLog.shared.record(.secret, "Secret added", detail: "\(vault.name)/\(secret.name) (\(secret.tier.rawValue), \(secret.scope))")
         }
         value = ""

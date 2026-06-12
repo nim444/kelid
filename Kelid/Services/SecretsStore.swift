@@ -46,25 +46,40 @@ final class SecretsStore {
 
     // MARK: - CRUD
 
-    func add(_ secret: VaultSecret, value: String, to vaultID: UUID) {
+    /// False when the Keychain refused the value — no metadata is written
+    /// then, so a secret can never exist without its value.
+    @discardableResult
+    func add(_ secret: VaultSecret, value: String, to vaultID: UUID) -> Bool {
+        guard KeychainStore.set(value, account: keychainAccount(vaultID, secret.name)) else {
+            return false
+        }
         var list = secrets(for: vaultID)
         list.append(secret)
         secretsByVault[vaultID.uuidString] = list
-        KeychainStore.set(value, account: keychainAccount(vaultID, secret.name))
         persistMeta()
+        return true
     }
 
     /// Updates classification; replaces the value only when one is supplied.
-    func update(_ secret: VaultSecret, newValue: String?, in vaultID: UUID) {
+    /// The name is the Keychain/seal key and must never change here — the UI
+    /// disables it on edit; a programmatic rename would orphan the value.
+    @discardableResult
+    func update(_ secret: VaultSecret, newValue: String?, in vaultID: UUID) -> Bool {
         var list = secrets(for: vaultID)
-        if let index = list.firstIndex(where: { $0.id == secret.id }) {
-            list[index] = secret
-            secretsByVault[vaultID.uuidString] = list
-            if let newValue, !newValue.isEmpty {
-                KeychainStore.set(newValue, account: keychainAccount(vaultID, secret.name))
-            }
-            persistMeta()
+        guard let index = list.firstIndex(where: { $0.id == secret.id }) else { return false }
+        guard list[index].name == secret.name else {
+            assertionFailure("secret rename is not supported — Keychain and seal keys are name-based")
+            return false
         }
+        if let newValue, !newValue.isEmpty {
+            guard KeychainStore.set(newValue, account: keychainAccount(vaultID, secret.name)) else {
+                return false
+            }
+        }
+        list[index] = secret
+        secretsByVault[vaultID.uuidString] = list
+        persistMeta()
+        return true
     }
 
     func remove(_ secret: VaultSecret, from vaultID: UUID) {

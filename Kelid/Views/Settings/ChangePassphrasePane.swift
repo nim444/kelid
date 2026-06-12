@@ -7,8 +7,9 @@ struct ChangePassphrasePane: View {
     @State private var busy = false
     @State private var status: (PaneStatus.Kind, String)?
 
+    // Same minimum as onboarding — changing must never weaken the policy.
     private var canSubmit: Bool {
-        !busy && !current.isEmpty && newPass.count >= 8 && newPass == confirm
+        !busy && !current.isEmpty && newPass.count >= 10 && newPass == confirm
     }
 
     var body: some View {
@@ -25,8 +26,8 @@ struct ChangePassphrasePane: View {
                 field("New passphrase", text: $newPass)
                 field("Confirm new passphrase", text: $confirm)
 
-                if !newPass.isEmpty, newPass.count < 8 {
-                    PaneStatus(kind: .info, message: "Use at least 8 characters.")
+                if !newPass.isEmpty, newPass.count < 10 {
+                    PaneStatus(kind: .info, message: "Use at least 10 characters.")
                 } else if !confirm.isEmpty, newPass != confirm {
                     PaneStatus(kind: .error, message: "The new passphrases do not match.")
                 }

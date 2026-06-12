@@ -69,5 +69,8 @@ by companies is not permitted.
 
 ## Status
 
-Pre-code. Next step: splash screen and onboarding skeleton (Swift, SwiftUI, macOS 27 SDK,
-built manually in Xcode), then logic milestone by milestone against the inventory above.
+Pre-alpha, built milestone by milestone (Swift, SwiftUI, macOS 27 SDK, built manually in
+Xcode). Onboarding, lock screen, providers, Telegram alerts, the tamper-evident audit log,
+Guardian (AI judge), vaults + secrets, and the MCP agent gateway are live; the crypto core
+(Argon2id keyslots, per-vault encrypted stores) is the next major engine. Every step is
+logged in [docs/MILESTONES.md](docs/MILESTONES.md).

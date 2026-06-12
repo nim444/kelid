@@ -102,11 +102,16 @@ nonisolated enum TelegramService {
     // MARK: - Plumbing
 
     private static func call(token: String, method: String, query: [String: String] = [:]) async throws -> Data {
-        var components = URLComponents(string: "https://api.telegram.org/bot\(token)/\(method)")!
+        // A pasted token with URL-hostile characters must fail cleanly,
+        // never force-unwrap into a crash.
+        guard var components = URLComponents(string: "https://api.telegram.org/bot\(token)/\(method)") else {
+            throw TelegramError.badToken
+        }
         if !query.isEmpty {
             components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
-        var request = URLRequest(url: components.url!)
+        guard let url = components.url else { throw TelegramError.badToken }
+        var request = URLRequest(url: url)
         request.timeoutInterval = 15
 
         let (data, response) = try await session.data(for: request)

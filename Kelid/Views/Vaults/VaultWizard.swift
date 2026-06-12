@@ -104,10 +104,21 @@ struct VaultWizard: View {
         .padding(20)
     }
 
+    private var parsedCallers: [String] {
+        callersText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
     private var canAdvance: Bool {
-        guard step == 0 else { return true }
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        return !trimmed.isEmpty && !vaults.nameTaken(trimmed, excluding: existing?.id)
+        switch step {
+        case 0:
+            let trimmed = name.trimmingCharacters(in: .whitespaces)
+            return !trimmed.isEmpty && !vaults.nameTaken(trimmed, excluding: existing?.id)
+        case 1:
+            // "Named only" with nobody named would deny every agent silently.
+            return agentMode != .list || !parsedCallers.isEmpty
+        default:
+            return true
+        }
     }
 
     private func explainer(_ text: String) -> some View {
@@ -179,6 +190,9 @@ struct VaultWizard: View {
                 TextField("caller names, comma-separated (e.g. claude-code, opencode)", text: $callersText)
                     .textFieldStyle(.roundedBorder)
                     .font(.kelid(13, .regular))
+                if parsedCallers.isEmpty {
+                    PaneStatus(kind: .info, message: "Name at least one caller — \u{201C}Named only\u{201D} with an empty list denies every agent.")
+                }
             }
 
             fieldLabel("Default rate limit per secret", hint: "Each secret carries its own limit, counted across all callers — a runaway agent hits the ceiling on that secret without locking the rest of the vault. Override per secret later.")
@@ -350,9 +364,7 @@ struct VaultWizard: View {
     }
 
     private func finish() {
-        let callers = agentMode == .list
-            ? callersText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            : []
+        let callers = agentMode == .list ? parsedCallers : []
         let rate = "\(rateCount)/\(rateUnit)"
         let assigned = guardianEnabled ? assignedGuardianID : nil
 
