@@ -10,8 +10,21 @@ struct ProvidersView: View {
         var id: String { rawValue }
     }
 
+    enum CommsProvider: String, CaseIterable, Identifiable {
+        case telegram, resend
+        var id: String { rawValue }
+
+        var name: String {
+            switch self {
+            case .telegram: "Telegram"
+            case .resend: "Resend"
+            }
+        }
+    }
+
     @State private var category: Category = .ai
     @State private var selected: AIProvider = .openRouter
+    @State private var selectedComms: CommsProvider = .telegram
 
     var body: some View {
         HStack(spacing: 0) {
@@ -49,11 +62,27 @@ struct ProvidersView: View {
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
             case .comms:
-                Spacer()
-                Text("Channels appear here")
-                    .font(.kelid(12, .regular))
-                    .foregroundStyle(.secondary)
-                Spacer()
+                List(selection: $selectedComms) {
+                    ForEach(CommsProvider.allCases) { provider in
+                        Label {
+                            Text(provider.name).font(.kelid(13, .medium))
+                        } icon: {
+                            switch provider {
+                            case .telegram:
+                                Image("TelegramLogo")
+                                    .renderingMode(.template)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 16, height: 16)
+                            case .resend:
+                                Image(systemName: "envelope")
+                            }
+                        }
+                        .tag(provider)
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             }
         }
     }
@@ -67,12 +96,18 @@ struct ProvidersView: View {
                     AIProviderPane(provider: selected)
                         .id(selected)
                 case .comms:
-                    ComingSoon(
-                        icon: "paperplane",
-                        title: "Communications",
-                        message: "Connect outbound channels like Telegram or Resend to send Kelid notifications — access alerts, approvals, and audit summaries. Coming soon."
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 360)
+                    switch selectedComms {
+                    case .telegram:
+                        TelegramPane()
+                            .id(selectedComms)
+                    case .resend:
+                        ComingSoon(
+                            icon: "envelope",
+                            title: "Resend",
+                            message: "Email alerts through the Resend API — access notices, approvals, and audit summaries. Coming soon."
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 360)
+                    }
                 }
             }
             .frame(maxWidth: 560, alignment: .leading)

@@ -15,6 +15,36 @@ Reset onboarding for testing:
 
 ---
 
+## Milestone 3.6 — Telegram alert channel with whitelist (2026-06-12)
+
+First Communications provider: a Telegram bot for audit alerts and (later)
+approvals. Security model adapted from **OpenClaw's** channel design
+(docs.openclaw.ai/channels/telegram): default-deny allowlist, pairing-style
+approval for unknown senders, long polling (a desktop app has no public
+webhook endpoint), groups as negative chat IDs.
+
+- `Services/TelegramService.swift` — Bot API client (ephemeral URLSession):
+  `getMe` (token validation), `discoverChats` (getUpdates → distinct chats,
+  discovery only), `send`. **The whitelist check lives inside `send()`** — a
+  non-whitelisted chat ID throws `notWhitelisted`; no caller can bypass it.
+- `Services/TelegramStore.swift` — bot token in the **Keychain**
+  (`comms.telegram.bot_token`); whitelist (chat id + title + kind — not
+  secrets) in UserDefaults; discovered-pending chats in memory only.
+- `Views/Providers/TelegramPane.swift` — token card (same gated-reveal
+  pattern: Touch ID to reveal, field clears after save, Test → "Connected as
+  @bot"), whitelist card: approved chat rows (send-test paperplane + remove),
+  **Find New Chats** (message the bot → appears as pending → explicit
+  Approve), manual chat-ID entry (negative = group).
+- Communications category now lists Telegram (live, official logo) and Resend
+  (coming soon). `TelegramStore` injected app-wide for the future audit/alert
+  engine.
+
+**Verification.** CLI build SUCCEEDED. **No wipe needed** — additive. User
+test: save BotFather token → Test → message the bot in Telegram → Find New
+Chats → Approve → paperplane sends "Kelid test message".
+
+---
+
 ## Milestone 3.5 — auto lock + lock screen (2026-06-11)
 
 **Session locking.** Kelid now locks itself when idle and on every launch.

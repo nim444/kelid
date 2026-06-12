@@ -4,6 +4,7 @@ import SwiftUI
 struct KelidApp: App {
     @State private var store = AppStore()
     @State private var providers = ProvidersStore()
+    @State private var telegram = TelegramStore()
 
     init() {
         KelidFont.registerIfNeeded()
@@ -14,6 +15,7 @@ struct KelidApp: App {
             RootView()
                 .environment(store)
                 .environment(providers)
+                .environment(telegram)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
